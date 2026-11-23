@@ -1,0 +1,4 @@
+# wasm builds keep their relocations so wasm-split-cli can cut them into lazily loaded chunks
+# (crates/card3d-web/build-web.sh). wasm-bindgen drops the section, so it costs nothing shipped.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=--emit-relocs"]

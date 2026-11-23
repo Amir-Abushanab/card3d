@@ -1,0 +1,6 @@
+{
+  "recipe": { "material": "silver", "texture": "brushed", "color": "#c9cdd2" },
+  "cardholderName": "Ada Lovelace",
+  "shape": { "cutouts": ["window"] },
+  "addons": { "vines": { "time": 18, "density": 0.8 } }
+}

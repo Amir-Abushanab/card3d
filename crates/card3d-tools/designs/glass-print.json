@@ -1,0 +1,8 @@
+{
+  "recipe": { "material": "glass", "color": "#d8e8f0", "polish": 40 },
+  "cardholderName": "Grace Hopper",
+  "cardholderBio": "Rear Admiral",
+  "contactless": { "finish": "embossed" },
+  "finish": { "name": "engraved", "logo": "etched" },
+  "textLines": [{ "text": "Compiler", "placement": "top", "align": "right" }]
+}

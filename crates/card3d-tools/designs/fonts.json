@@ -1,0 +1,11 @@
+{
+  "recipe": { "material": "brass", "texture": "brushed", "color": "#e8c27a", "polish": 70 },
+  "cardholderName": "Hedy Lamarr",
+  "cardholderBio": "Inventor · Ödön Žižek",
+  "font": "playfair",
+  "textLines": [
+    { "text": "Frequency hopping", "font": "plex-mono", "size": 0.9 },
+    { "text": "Since 1942", "font": "unbounded", "placement": "bottom-right", "size": 0.7 },
+    { "text": "Manrope line", "font": "manrope", "placement": "top", "size": 0.6, "tracking": 0.1 }
+  ]
+}

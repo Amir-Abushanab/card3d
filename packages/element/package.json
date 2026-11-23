@@ -1,0 +1,71 @@
+{
+  "name": "@card3d/element",
+  "version": "0.0.0",
+  "description": "Drop-in 3D metal cards for any page, Vue, Svelte or plain HTML: the <metal-card> custom element",
+  "keywords": [
+    "3d",
+    "card",
+    "custom-elements",
+    "metal",
+    "web-components",
+    "webgl",
+    "webgpu",
+    "tanstack-intent"
+  ],
+  "homepage": "https://github.com/Amir-Abushanab/card3d/tree/main/packages/element#readme",
+  "bugs": "https://github.com/Amir-Abushanab/card3d/issues",
+  "license": "MIT",
+  "author": "Amir Abushanab (https://github.com/Amir-Abushanab)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Amir-Abushanab/card3d.git",
+    "directory": "packages/element"
+  },
+  "files": [
+    "dist",
+    "THIRD_PARTY_NOTICES.md",
+    "skills/embed-metal-card"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./src/index.ts",
+    "./src/standalone.ts",
+    "./dist/*.js",
+    "./dist/standalone/*"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./standalone": "./src/standalone.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./standalone": {
+        "types": "./dist/standalone.d.ts",
+        "default": "./dist/standalone/metal-card.js"
+      },
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown && pnpm build:standalone",
+    "build:standalone": "vite build --config vite.standalone.config.ts && CARD3D_STANDALONE=iife vite build --config vite.standalone.config.ts",
+    "prepack": "node ../../scripts/package-notices.mjs --notices",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@card3d/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@tanstack/intent": "0.5.6",
+    "tsdown": "^0.23.7",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

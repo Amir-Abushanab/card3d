@@ -1,0 +1,12 @@
+{
+  "recipe": { "material": "titanium", "texture": "brushed", "color": "#555b57", "polish": 64 },
+  "cardholderName": "Grace Hopper",
+  "cardholderBio": "Rear Admiral, United States Navy",
+  "finish": { "name": "engraved", "bio": "etched", "logo": "embossed" },
+  "contactless": { "scale": 0.9 },
+  "textLines": [
+    { "text": "4000 1234 5678 9010", "size": 1.1, "tracking": 0.08 },
+    { "text": "Valid thru 12/29", "placement": "bottom-right", "size": 0.7 },
+    { "text": "Member since 1943", "placement": "top", "size": 0.6 }
+  ]
+}

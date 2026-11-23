@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>metal-card embed example</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; background: #0b0b10; color: #e8e8ee; font: 15px/1.55 system-ui, sans-serif; }
+      main { max-width: 1040px; margin: 0 auto; padding: 40px 16px 80px; }
+      h1 { font-size: 26px; margin: 0 0 4px; }
+      h2 { font-size: 17px; margin: 48px 0 12px; }
+      p { margin: 0 0 16px; color: #a6a6b4; max-width: 70ch; }
+      code { color: #e8c27a; }
+      .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+      figure { margin: 0; }
+      figcaption { margin-top: 8px; font-size: 13px; color: #8a8a98; }
+      #hero { width: min(560px, 100%); border-radius: 20px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+      .grid metal-card { width: 100%; border-radius: 14px; background: #15151d; }
+      .spacer { height: 120vh; display: grid; place-items: center; color: #55556a; }
+    </style>
+    <!-- The CDN bundle (@card3d/core and the card engine's loader included). Published, this is
+         https://cdn.jsdelivr.net/npm/@card3d/element@0.1/dist/standalone/metal-card.js
+         The local server maps /npm/@card3d/element/… to packages/element/ the same way. -->
+    <script type="module" src="/npm/@card3d/element/dist/standalone/metal-card.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1>&lt;metal-card&gt;</h1>
+      <p>Three ways to give a card its design: a Card Studio share link, design JSON, or a few attributes. Drag a card to turn it, click to flip it.</p>
+
+      <div class="row">
+        <figure>
+          <metal-card id="hero" backdrop share="https://card-studio.pages.dev/#d=H4sIAAAAAAAAE22Ry27bMBBFf8W43bKAk8J1ymWLJuki3Ti7oosRNZQYU6QwHAUJDP97QdtyXt1xzjx4yNlB2IWRYXcYSFkCRVg0QqXAYCRVlgSLlBPDQPlJJ-EX4HLMAotP65Uj72HQCYUE-2VpMOYYSg-7ujIQjoE97PrSoIzsVKYBdmlATVEhpyEn2Ivl0lQR19_mmDeh5QKrMrGBl5y0UlhPsbBBX0v0OVadx4GeYOBziPdnR1bXc3vCv5JyKkGfYddXx-abSLXu6ym8y0eJ0305xI2jOv1gVeMf-ZGFujrb1SMMGnLbN1YzeGdW8fX_7ebUO8N50CvLGb01nftf287sg_HewJG0fY4ty28aauZGyPHiNo_j4Ukv-e8hw-KOh4ZlUUJyvLj4trqEQcuOYoH989egTOLJ8SZP4uq-dvszuxcmHTjpCR-W-NN7dgqbphgNcvPATk-_dUQNlzFvz6HPSWFRRnL8uZOsXLYwiKHrNaQOFi3JFvt_nIRxD80CAAA"></metal-card>
+          <figcaption>A share link (<code>share</code>), with the lighting preset's backdrop (<code>backdrop</code>).</figcaption>
+        </figure>
+        <figure>
+          <metal-card
+            id="json"
+            design='{"recipe":{"material":"brass","texture":"guilloche","pattern":"orbit","color":"#e8c27a","polish":70,"relief":60},"cardholderName":"Ada Lovelace","cardholderBio":"Member since 1843","font":"playfair"}'
+          ></metal-card>
+          <figcaption>Design JSON (<code>design</code>).</figcaption>
+        </figure>
+        <figure>
+          <metal-card id="attrs" material="titanium" texture="brushed" color="#d5dde8" name="Katherine Johnson" bio="Member since 1953" font="unbounded" interaction="turntable" auto-rotate="30" label="Titanium card, turning slowly"></metal-card>
+          <figcaption>Attributes, a turntable that spins (<code>interaction="turntable" auto-rotate="30"</code>).</figcaption>
+        </figure>
+      </div>
+
+      <div class="spacer" aria-hidden="true">scroll: the cards below start only when they come into view</div>
+
+      <h2>Presets, lazily started</h2>
+      <div class="grid" id="presets">
+        <metal-card preset="pearl-guilloche" name="Alan Turing" quality="performance"></metal-card>
+        <metal-card preset="hero-black" name="Grace Hopper" quality="performance"></metal-card>
+        <metal-card preset="cosmos-sparkle" name="Edsger Dijkstra" quality="performance"></metal-card>
+        <metal-card preset="brushed-tangerine" name="Barbara Liskov" quality="performance"></metal-card>
+        <metal-card preset="sunset-mesh" name="Claude Shannon" quality="performance"></metal-card>
+        <metal-card preset="hammered-black-nickel" name="Margaret Hamilton" quality="performance"></metal-card>
+      </div>
+    </main>
+  </body>
+</html>

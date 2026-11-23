@@ -1,0 +1,5 @@
+{
+  "recipe": { "material": "gold", "color": "#c9a46a" },
+  "cardholderName": "Ada Lovelace",
+  "addons": { "vines": { "cycle": false, "density": 0.5, "leafColor": "#c04080", "time": 3 } }
+}

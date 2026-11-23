@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 160,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "crates/*/**",
+    "!crates/card3d-tools/**",
+    "!crates/card3d-web/web/**",
+    "crates/card3d-tools/designs/**/*.json",
+    "apple/**",
+    "android/**",
+    "_artifacts/**",
+    ".intent/**",
+    "packages/core/wasm/pkg*/**",
+    "packages/core/assets/**",
+    "pnpm-lock.yaml",
+    "**/*.md",
+    "**/*.html",
+    "**/*.toml"
+  ]
+}

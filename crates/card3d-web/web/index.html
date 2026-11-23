@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Card engine (Rust)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #16171c; color: #c9cdd2; font: 14px system-ui, sans-serif; }
+  canvas { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: grab; }
+  #note { position: fixed; left: 16px; bottom: 16px; opacity: 0.7; }
+</style>
+<canvas id="card"></canvas>
+<div id="note">Drag to turn the card.</div>
+<script type="module">
+  // Serve the repository root and open /crates/card3d-web/web/ (the card font comes from packages/core).
+  //   ?design=<url of a CardDesign JSON>   default: the tools' brushed fixture
+  //   ?backend=webgpu|webgl                 force a build (else the loader picks, falling back to WebGL)
+  //   ?w=&h=                                fix the canvas size (CSS px, pixel ratio 1), for comparisons;
+  //                                         window.__render(euler) → PNG data URL
+  //                                         window.__ar(format) → the AR model ("glb" / "usdz"), base64
+  import { createCard } from "/packages/core/wasm/loader.js";
+
+  // The card fonts under core's family names ("card3d Inter", …), as packages/core/src/fonts.ts
+  // registers them (here for the demo and the comparison; the packages use core's loaders).
+  const LATIN = "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD";
+  const LATIN_EXT = "U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF";
+  const CARD_FONTS = {
+    inter: ["card3d Inter", "inter-latin-wght-normal", "inter-latin-ext-wght-normal", "100 900"],
+    manrope: ["card3d Manrope", "manrope-latin-700-normal", "manrope-latin-ext-700-normal", "700"],
+    "space-grotesk": ["card3d Space Grotesk", "space-grotesk-latin-700-normal", "space-grotesk-latin-ext-700-normal", "700"],
+    unbounded: ["card3d Unbounded", "unbounded-latin-700-normal", "unbounded-latin-ext-700-normal", "700"],
+    playfair: ["card3d Playfair Display", "playfair-display-latin-700-normal", "playfair-display-latin-ext-700-normal", "700"],
+    "plex-mono": ["card3d IBM Plex Mono", "ibm-plex-mono-latin-700-normal", "ibm-plex-mono-latin-ext-700-normal", "700"],
+  };
+  for (const [family, latin, ext, weight] of Object.values(CARD_FONTS)) {
+    for (const [file, range] of [[latin, LATIN], [ext, LATIN_EXT]]) {
+      document.fonts.add(new FontFace(family, `url(/packages/core/assets/fonts/${file}.woff2) format("woff2")`, { weight, unicodeRange: range }));
+    }
+  }
+  // `assets`: the provider's name font (the fixture's `__harness.assets`).
+  async function loadCardFonts(design, assets) {
+    const provider = assets?.nameFontFamily ?? "card3d Inter";
+    const name = CARD_FONTS[design.font]?.[0] ?? provider;
+    const texts = [[name, `${design.cardholderName ?? ""}${design.cardholderBio ?? ""}`]];
+    for (const l of design.textLines ?? []) texts.push([CARD_FONTS[l.font]?.[0] ?? name, l.text ?? ""]);
+    await Promise.all(texts.map(([family, text]) => document.fonts.load(`700 100px "${family}"`, `H${text.toLocaleUpperCase()}`)));
+  }
+
+  const q = new URLSearchParams(location.search);
+  let canvas = document.getElementById("card");
+  const note = document.getElementById("note");
+  const fixed = q.has("w");
+  if (fixed) Object.assign(canvas.style, { width: `${q.get("w")}px`, height: `${q.get("h")}px` });
+  const ratio = fixed ? 1 : Math.min(2, devicePixelRatio || 1);
+  const size = () => [Math.round(canvas.clientWidth * ratio), Math.round(canvas.clientHeight * ratio)];
+
+  try {
+    const designUrl = new URL(q.get("design") ?? "/crates/card3d-tools/designs/brushed-silver.json", location.href);
+    const design = await (await fetch(designUrl)).text();
+    // A fixture's harness settings (crates/card3d-tools/designs/generate.ts): its asset provider, whose
+    // `src`s (like the design's own) are relative to the design; a camera path frozen at a moment.
+    const harness = JSON.parse(design).__harness;
+    const resolveUrl = (src) => (/^(?:[a-z]+:|\/)/i.test(src) ? src : new URL(src, designUrl).href);
+    await loadCardFonts(JSON.parse(design), harness?.assets);
+    [canvas.width, canvas.height] = size();
+    let dirty = true;
+    const t0 = performance.now();
+    const card = await createCard(canvas, design, {
+      force: q.get("backend") ?? undefined,
+      // ?w= (comparisons): fixed poses, the studio camera; else the card is interactive.
+      stage: { quality: q.get("quality") ?? "full", fit: q.get("fit") ?? "studio", interactive: !fixed, intro: !fixed },
+      resolveUrl,
+      assets: harness?.assets ?? null,
+      // The scene environments' files, as packages/core's catalog names them.
+      environmentUrl: (env) =>
+        ["softbox", "cyclorama", "loft", "warm-hall", "sunset"].includes(env) ? `/packages/core/assets/environments/${env}.webp` : /\.(hdr|webp)([?#].*)?$/i.test(env) ? env : null,
+      onCanvas: (c) => {
+        canvas = c;
+        [canvas.width, canvas.height] = size();
+        dirty = true;
+      },
+      onFallback: (why) => {
+        console.warn(`card3d: switching to WebGL: ${why}`);
+        note.textContent = `Drag to turn the card. webgl (fallback).`;
+        dirty = true;
+      },
+    });
+    canvas = card.canvas;
+    await card.stickersReady;
+    if (harness?.orbit) {
+      card.setCameraOrbit(harness.orbit.azimuth, harness.orbit.elevation, harness.orbit.distance);
+      card.setLift(harness.lift ?? 0);
+    }
+
+    const frame = (now) => {
+      if (card.advance(now ?? performance.now()) & 1) dirty = true;
+      if (dirty) {
+        const [w, h] = size();
+        if (w !== canvas.width || h !== canvas.height) {
+          [canvas.width, canvas.height] = [w, h];
+          card.resize(w, h);
+        }
+        card.render();
+        dirty = false;
+      }
+      requestAnimationFrame(frame);
+    };
+    frame();
+    note.textContent += ` ${card.backend}, first frame ${Math.round(performance.now() - t0)} ms.`;
+    addEventListener("resize", () => (dirty = true));
+
+    // Input on the document, so a canvas swapped in by the WebGL fallback keeps working.
+    const local = (e) => {
+      const r = canvas.getBoundingClientRect();
+      return [e.clientX - r.left, e.clientY - r.top, r.width, r.height];
+    };
+    document.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const [x, y, w, h] = local(e);
+      if (card.stage?.pointerDown(e.pointerId, x, y, w, h, performance.now())) dirty = true;
+    });
+    document.addEventListener("pointermove", (e) => {
+      const [x, y] = local(e);
+      if (card.stage?.pointerMove(e.pointerId, x, y, performance.now())) {
+        e.preventDefault();
+        dirty = true;
+      }
+    });
+    document.addEventListener("pointerup", (e) => {
+      const [x, y] = local(e);
+      card.stage?.pointerUp(e.pointerId, x, y, performance.now());
+      dirty = true;
+    });
+    document.addEventListener("keydown", (e) => {
+      if (card.stage?.key(e.key, performance.now())) {
+        e.preventDefault();
+        dirty = true;
+      }
+    });
+    if (fixed) card.setRotation(-0.22, 0.38, 0.04);
+
+    window.__card = card;
+    window.__backend = card.backend;
+    window.__render = (e) => {
+      card.setRotation(...e);
+      card.render();
+      return card.canvas.toDataURL("image/png");
+    };
+    window.__ar = async (format) => {
+      const { arModel } = await import("/packages/core/wasm/ar.js");
+      const bytes = await arModel(card, design, { format });
+      let bin = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(bin);
+    };
+    window.__ready = true;
+  } catch (e) {
+    note.textContent = `Could not start the card engine: ${e?.message ?? e}`;
+    window.__ready = String(e?.message ?? e);
+  }
+</script>
+</html>

@@ -1,0 +1,1028 @@
+{
+ "defaultName": "Ada Lovelace",
+ "defaultRecipe": {
+  "material": "silver",
+  "pattern": "none",
+  "texture": "none",
+  "color": "#d9d6cc",
+  "grain": 30,
+  "polish": 58,
+  "relief": 72,
+  "spectrum": 0,
+  "abstraction": 100,
+  "matchHoloSides": true,
+  "frontHolo": false,
+  "holoStyle": "vmax",
+  "foilTexture": "etched",
+  "foilIntensity": 78,
+  "holoGlare": 68,
+  "holoMotion": true,
+  "foilScale": 100,
+  "foilCoverage": "cover",
+  "backHolo": false,
+  "backHoloStyle": "vmax",
+  "backFoilTexture": "etched",
+  "backFoilIntensity": 78,
+  "backHoloGlare": 68,
+  "backHoloMotion": true,
+  "backFoilScale": 100,
+  "backFoilCoverage": "cover"
+ },
+ "materials": [
+  "silver",
+  "nickel",
+  "titanium",
+  "brass",
+  "oxide",
+  "carbon",
+  "glass"
+ ],
+ "textures": [
+  "none",
+  "brushed",
+  "guilloche",
+  "crosshatch",
+  "hammered",
+  "sandblasted",
+  "pinpoint",
+  "linen",
+  "carbon-fiber"
+ ],
+ "holoStyles": [
+  "common",
+  "uncommon",
+  "rare",
+  "holo",
+  "reverse",
+  "cosmos",
+  "radiant",
+  "amazing",
+  "rainbow",
+  "shiny",
+  "gallery",
+  "ultra",
+  "vmax",
+  "vstar",
+  "gold"
+ ],
+ "foilTextures": [
+  "etched",
+  "sparkle",
+  "microdot"
+ ],
+ "recipeControls": [
+  {
+   "key": "material",
+   "kind": "enum",
+   "options": [
+    "silver",
+    "nickel",
+    "titanium",
+    "brass",
+    "oxide",
+    "carbon",
+    "glass"
+   ]
+  },
+  {
+   "key": "color",
+   "kind": "color"
+  },
+  {
+   "key": "texture",
+   "kind": "enum",
+   "options": [
+    "none",
+    "brushed",
+    "guilloche",
+    "crosshatch",
+    "hammered",
+    "sandblasted",
+    "pinpoint",
+    "linen",
+    "carbon-fiber"
+   ]
+  },
+  {
+   "key": "pattern",
+   "kind": "enum",
+   "options": [
+    "none",
+    "orbit"
+   ]
+  },
+  {
+   "key": "grain",
+   "kind": "range",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "key": "polish",
+   "kind": "range",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "key": "relief",
+   "kind": "range",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "key": "spectrum",
+   "kind": "range",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "key": "abstraction",
+   "kind": "range",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "key": "frontHolo",
+   "kind": "boolean"
+  },
+  {
+   "key": "matchHoloSides",
+   "kind": "boolean"
+  },
+  {
+   "key": "holoStyle",
+   "kind": "enum",
+   "options": [
+    "common",
+    "uncommon",
+    "rare",
+    "holo",
+    "reverse",
+    "cosmos",
+    "radiant",
+    "amazing",
+    "rainbow",
+    "shiny",
+    "gallery",
+    "ultra",
+    "vmax",
+    "vstar",
+    "gold"
+   ]
+  },
+  {
+   "key": "foilTexture",
+   "kind": "enum",
+   "options": [
+    "etched",
+    "sparkle",
+    "microdot"
+   ]
+  },
+  {
+   "key": "foilIntensity",
+   "kind": "range",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "key": "holoGlare",
+   "kind": "range",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "key": "holoMotion",
+   "kind": "boolean"
+  },
+  {
+   "key": "foilScale",
+   "kind": "range",
+   "min": 25,
+   "max": 400
+  },
+  {
+   "key": "foilCoverage",
+   "kind": "enum",
+   "options": [
+    "cover",
+    "tile"
+   ]
+  },
+  {
+   "key": "backHolo",
+   "kind": "boolean"
+  },
+  {
+   "key": "backHoloStyle",
+   "kind": "enum",
+   "options": [
+    "common",
+    "uncommon",
+    "rare",
+    "holo",
+    "reverse",
+    "cosmos",
+    "radiant",
+    "amazing",
+    "rainbow",
+    "shiny",
+    "gallery",
+    "ultra",
+    "vmax",
+    "vstar",
+    "gold"
+   ]
+  },
+  {
+   "key": "backFoilTexture",
+   "kind": "enum",
+   "options": [
+    "etched",
+    "sparkle",
+    "microdot"
+   ]
+  },
+  {
+   "key": "backFoilIntensity",
+   "kind": "range",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "key": "backHoloGlare",
+   "kind": "range",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "key": "backHoloMotion",
+   "kind": "boolean"
+  },
+  {
+   "key": "backFoilScale",
+   "kind": "range",
+   "min": 25,
+   "max": 400
+  },
+  {
+   "key": "backFoilCoverage",
+   "kind": "enum",
+   "options": [
+    "cover",
+    "tile"
+   ]
+  }
+ ],
+ "fonts": [
+  "inter",
+  "manrope",
+  "space-grotesk",
+  "unbounded",
+  "playfair",
+  "plex-mono"
+ ],
+ "lighting": [
+  "studio",
+  "dramatic",
+  "warm",
+  "cool",
+  "dark",
+  "light"
+ ],
+ "logo": {
+  "positions": [
+   "corner",
+   "top-right",
+   "center",
+   "bottom-right"
+  ],
+  "scaleMin": 0.4,
+  "scaleMax": 3,
+  "pathChars": 16000,
+  "srcChars": 96000
+ },
+ "shaders": [
+  {
+   "id": "thermal",
+   "targets": [
+    "skin",
+    "overlay"
+   ],
+   "defaultTarget": "skin",
+   "params": [
+    {
+     "key": "contours",
+     "type": "float"
+    },
+    {
+     "key": "speed",
+     "type": "float"
+    },
+    {
+     "key": "phase",
+     "type": "float"
+    },
+    {
+     "key": "flowStrength",
+     "type": "float"
+    },
+    {
+     "key": "turbulence",
+     "type": "float"
+    },
+    {
+     "key": "scale",
+     "type": "float"
+    },
+    {
+     "key": "lineDarkness",
+     "type": "float"
+    },
+    {
+     "key": "quiet",
+     "type": "float"
+    },
+    {
+     "key": "avoidChip",
+     "type": "bool"
+    },
+    {
+     "key": "ink",
+     "type": "color"
+    },
+    {
+     "key": "color1",
+     "type": "color"
+    },
+    {
+     "key": "color2",
+     "type": "color"
+    },
+    {
+     "key": "color3",
+     "type": "color"
+    },
+    {
+     "key": "color4",
+     "type": "color"
+    },
+    {
+     "key": "color5",
+     "type": "color"
+    }
+   ]
+  },
+  {
+   "id": "liquid-metal",
+   "targets": [
+    "overlay",
+    "skin"
+   ],
+   "defaultTarget": "overlay",
+   "params": [
+    {
+     "key": "mask",
+     "type": "int",
+     "options": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ]
+    },
+    {
+     "key": "speed",
+     "type": "float"
+    },
+    {
+     "key": "motion",
+     "type": "bool"
+    },
+    {
+     "key": "tint",
+     "type": "color"
+    },
+    {
+     "key": "repetition",
+     "type": "float"
+    },
+    {
+     "key": "softness",
+     "type": "float"
+    },
+    {
+     "key": "shiftRed",
+     "type": "float"
+    },
+    {
+     "key": "shiftBlue",
+     "type": "float"
+    },
+    {
+     "key": "distortion",
+     "type": "float"
+    },
+    {
+     "key": "contour",
+     "type": "float"
+    },
+    {
+     "key": "angle",
+     "type": "float"
+    },
+    {
+     "key": "scale",
+     "type": "float"
+    },
+    {
+     "key": "rotation",
+     "type": "float"
+    },
+    {
+     "key": "offset",
+     "type": "vec2"
+    },
+    {
+     "key": "avoidChip",
+     "type": "bool"
+    }
+   ]
+  },
+  {
+   "id": "caustics",
+   "targets": [
+    "skin",
+    "overlay"
+   ],
+   "defaultTarget": "skin",
+   "params": [
+    {
+     "key": "floor",
+     "type": "int",
+     "options": [
+      0,
+      1,
+      2
+     ]
+    },
+    {
+     "key": "speed",
+     "type": "float"
+    },
+    {
+     "key": "waveHeight",
+     "type": "float"
+    },
+    {
+     "key": "depth",
+     "type": "float"
+    },
+    {
+     "key": "scale",
+     "type": "float"
+    },
+    {
+     "key": "tileScale",
+     "type": "float"
+    },
+    {
+     "key": "caustics",
+     "type": "float"
+    },
+    {
+     "key": "flowStrength",
+     "type": "float"
+    },
+    {
+     "key": "deepColor",
+     "type": "color"
+    },
+    {
+     "key": "shallowColor",
+     "type": "color"
+    },
+    {
+     "key": "causticColor",
+     "type": "color"
+    }
+   ]
+  },
+  {
+   "id": "lens",
+   "targets": [
+    "overlay",
+    "skin"
+   ],
+   "defaultTarget": "overlay",
+   "params": [
+    {
+     "key": "center",
+     "type": "vec2"
+    },
+    {
+     "key": "radius",
+     "type": "float"
+    },
+    {
+     "key": "coating",
+     "type": "color"
+    },
+    {
+     "key": "glint",
+     "type": "float"
+    },
+    {
+     "key": "response",
+     "type": "float"
+    },
+    {
+     "key": "exposure",
+     "type": "float"
+    }
+   ]
+  },
+  {
+   "id": "vinyl",
+   "targets": [
+    "skin",
+    "overlay"
+   ],
+   "defaultTarget": "skin",
+   "params": [
+    {
+     "key": "center",
+     "type": "vec2"
+    },
+    {
+     "key": "radius",
+     "type": "float"
+    },
+    {
+     "key": "grooves",
+     "type": "float"
+    },
+    {
+     "key": "spin",
+     "type": "float"
+    },
+    {
+     "key": "sheen",
+     "type": "float"
+    },
+    {
+     "key": "labelSize",
+     "type": "float"
+    },
+    {
+     "key": "vinylColor",
+     "type": "color"
+    },
+    {
+     "key": "labelColor",
+     "type": "color"
+    },
+    {
+     "key": "bandColor",
+     "type": "color"
+    }
+   ]
+  },
+  {
+   "id": "wood",
+   "targets": [
+    "skin",
+    "overlay"
+   ],
+   "defaultTarget": "skin",
+   "params": [
+    {
+     "key": "rings",
+     "type": "float"
+    },
+    {
+     "key": "figure",
+     "type": "float"
+    },
+    {
+     "key": "pores",
+     "type": "float"
+    },
+    {
+     "key": "scale",
+     "type": "float"
+    },
+    {
+     "key": "angle",
+     "type": "float"
+    },
+    {
+     "key": "seed",
+     "type": "float"
+    },
+    {
+     "key": "lightColor",
+     "type": "color"
+    },
+    {
+     "key": "darkColor",
+     "type": "color"
+    }
+   ]
+  },
+  {
+   "id": "oil-slick",
+   "targets": [
+    "overlay",
+    "skin"
+   ],
+   "defaultTarget": "overlay",
+   "params": [
+    {
+     "key": "strength",
+     "type": "float"
+    },
+    {
+     "key": "thickness",
+     "type": "float"
+    },
+    {
+     "key": "scale",
+     "type": "float"
+    },
+    {
+     "key": "speed",
+     "type": "float"
+    },
+    {
+     "key": "hue",
+     "type": "float"
+    },
+    {
+     "key": "saturation",
+     "type": "float"
+    }
+   ]
+  },
+  {
+   "id": "gradient-mesh",
+   "targets": [
+    "skin",
+    "overlay"
+   ],
+   "defaultTarget": "skin",
+   "params": [
+    {
+     "key": "colorA",
+     "type": "color"
+    },
+    {
+     "key": "colorB",
+     "type": "color"
+    },
+    {
+     "key": "colorC",
+     "type": "color"
+    },
+    {
+     "key": "colorD",
+     "type": "color"
+    },
+    {
+     "key": "speed",
+     "type": "float"
+    },
+    {
+     "key": "warp",
+     "type": "float"
+    },
+    {
+     "key": "softness",
+     "type": "float"
+    },
+    {
+     "key": "grain",
+     "type": "float"
+    }
+   ]
+  },
+  {
+   "id": "foil-flakes",
+   "targets": [
+    "overlay",
+    "skin"
+   ],
+   "defaultTarget": "overlay",
+   "params": [
+    {
+     "key": "amount",
+     "type": "float"
+    },
+    {
+     "key": "flakeSize",
+     "type": "float"
+    },
+    {
+     "key": "sharpness",
+     "type": "float"
+    },
+    {
+     "key": "spread",
+     "type": "float"
+    },
+    {
+     "key": "twinkle",
+     "type": "float"
+    },
+    {
+     "key": "grain",
+     "type": "float"
+    },
+    {
+     "key": "tint",
+     "type": "color"
+    }
+   ]
+  },
+  {
+   "id": "halftone",
+   "targets": [
+    "skin",
+    "overlay"
+   ],
+   "defaultTarget": "skin",
+   "params": [
+    {
+     "key": "source",
+     "type": "int",
+     "options": [
+      0,
+      1,
+      2
+     ]
+    },
+    {
+     "key": "cellSize",
+     "type": "float"
+    },
+    {
+     "key": "angle",
+     "type": "float"
+    },
+    {
+     "key": "contrast",
+     "type": "float"
+    },
+    {
+     "key": "invert",
+     "type": "bool"
+    },
+    {
+     "key": "ink",
+     "type": "color"
+    }
+   ]
+  },
+  {
+   "id": "scanlines",
+   "targets": [
+    "overlay",
+    "skin"
+   ],
+   "defaultTarget": "overlay",
+   "params": [
+    {
+     "key": "lines",
+     "type": "float"
+    },
+    {
+     "key": "intensity",
+     "type": "float"
+    },
+    {
+     "key": "glow",
+     "type": "float"
+    },
+    {
+     "key": "speed",
+     "type": "float"
+    },
+    {
+     "key": "lineColor",
+     "type": "color"
+    },
+    {
+     "key": "glowColor",
+     "type": "color"
+    }
+   ]
+  }
+ ],
+ "prelude": [
+  "uTime",
+  "uResolution",
+  "uTilt",
+  "uPointer",
+  "uBaseColor",
+  "uArtwork",
+  "uHasArtwork",
+  "uChip",
+  "uAspect",
+  "uSide",
+  "uOverlay",
+  "uEye",
+  "uOpacity",
+  "cardUv",
+  "facePos",
+  "viewDir",
+  "faceNormal",
+  "vUv",
+  "vLocal"
+ ],
+ "effects": [
+  {
+   "id": "shine",
+   "params": [
+    {
+     "key": "tone",
+     "type": "select",
+     "options": [
+      "gold",
+      "ice"
+     ]
+    },
+    {
+     "key": "intensity",
+     "type": "float",
+     "min": 0,
+     "max": 2
+    },
+    {
+     "key": "time",
+     "type": "float",
+     "min": 0,
+     "max": 3600
+    }
+   ]
+  },
+  {
+   "id": "vines",
+   "params": [
+    {
+     "key": "cycle",
+     "type": "bool"
+    },
+    {
+     "key": "density",
+     "type": "float",
+     "min": 0.1,
+     "max": 1
+    },
+    {
+     "key": "leafColor",
+     "type": "color"
+    },
+    {
+     "key": "time",
+     "type": "float",
+     "min": 0,
+     "max": 80
+    }
+   ]
+  }
+ ],
+ "addons": [
+  "shine",
+  "vines"
+ ],
+ "cornerRadius": {
+  "min": 0.10670618747684328,
+  "iso": 0.11782141533901447,
+  "max": 0.12893664320118564
+ },
+ "contactlessScale": {
+  "min": 0.4,
+  "max": 1.2
+ },
+ "decal": {
+  "minCrop": 0.02,
+  "aspectMin": 0.01,
+  "aspectMax": 100
+ },
+ "fields": {
+  "design": [
+   "recipe",
+   "cardholderName",
+   "cardholderBio",
+   "decals",
+   "surfaceSources",
+   "surfaceTreatments",
+   "materialOverride",
+   "brandingOverride",
+   "frontLayout",
+   "shaders",
+   "addons",
+   "font",
+   "logo",
+   "lighting",
+   "finish",
+   "edge",
+   "shape",
+   "contactless",
+   "textLines",
+   "scene"
+  ],
+  "materialOverride": [
+   "color",
+   "metalness",
+   "roughness",
+   "clearcoat",
+   "clearcoatRoughness",
+   "transmission",
+   "thickness",
+   "ior"
+  ],
+  "brandingOverride": [
+   "color",
+   "metalness",
+   "roughness",
+   "clearcoat",
+   "clearcoatRoughness",
+   "transmission",
+   "thickness",
+   "ior",
+   "brandingClearcoat"
+  ],
+  "finish": [
+   "name",
+   "bio",
+   "logo"
+  ],
+  "edge": [
+   "finish",
+   "color",
+   "chamfer"
+  ],
+  "shape": [
+   "cornerRadius",
+   "orientation",
+   "cutouts"
+  ],
+  "contactless": [
+   "finish",
+   "scale"
+  ],
+  "textLine": [
+   "text",
+   "font",
+   "size",
+   "tracking",
+   "align",
+   "placement"
+  ],
+  "logo": [
+   "path",
+   "viewBox",
+   "origin",
+   "fillRule",
+   "src",
+   "aspect",
+   "position",
+   "scale"
+  ],
+  "scene": [
+   "environment",
+   "environmentIntensity",
+   "environmentRotation",
+   "backdrop",
+   "backdropColor",
+   "backdropBlur",
+   "floor"
+  ],
+  "floor": [
+   "reflectivity",
+   "shadow",
+   "blur"
+  ],
+  "layer": [
+   "id",
+   "side",
+   "target",
+   "blend",
+   "opacity",
+   "params",
+   "code",
+   "language",
+   "animated",
+   "time",
+   "enabled"
+  ],
+  "addon": [
+   "shine",
+   "vines"
+  ]
+ }
+}

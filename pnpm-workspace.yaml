@@ -1,0 +1,23 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  # the comparison harness's page side; three.js (the archived reference engine) is its dev dependency only
+  - "crates/card3d-tools"
+
+# pnpm 11+ reads package settings here. esbuild (via Vite) needs its install script.
+allowBuilds:
+  esbuild: true
+
+# tweakpane 4's types re-export @tweakpane/core without declaring it; nest it as a peer.
+packageExtensions:
+  tweakpane:
+    peerDependencies:
+      "@tweakpane/core": "*"
+  # dependency-cruiser parses TypeScript with the compiler API, which TypeScript 7 (Go) doesn't have yet
+  # (supported: <7 or >=7.1); without this it silently skips every .ts file. Its own copy, not the project's.
+  dependency-cruiser:
+    dependencies:
+      typescript: "^6.0.3"
+
+# Never resolve a version published less than 3 days ago (minutes).
+minimumReleaseAge: 4320

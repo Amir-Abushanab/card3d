@@ -1,0 +1,24 @@
+[package]
+name = "card3d-native"
+description = "The card engine's native host: 2D canvases on tiny-skia, text with ab_glyph and the bundled card font."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+card3d-engine = { workspace = true, features = ["validate"] }
+tiny-skia = "0.12"
+ab_glyph = { version = "0.2", default-features = false, features = ["std", "variable-fonts"] }
+ttf-parser = { version = "0.25", default-features = false, features = ["std", "opentype-layout", "variable-fonts"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
+base64 = "0.23"
+# WOFF and WOFF2 pack fonts → TrueType / OpenType (pure Rust; MIT).
+wuff = "0.2"
+
+[dev-dependencies]
+# Writes WOFF test files (tests/fonts.rs).
+flate2 = "1"
+
+[lints]
+workspace = true

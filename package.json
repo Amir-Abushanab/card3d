@@ -1,0 +1,53 @@
+{
+  "name": "card3d-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Card Studio and the @card3d packages that power it",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Amir-Abushanab/card3d.git"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter card-studio dev",
+    "build": "pnpm -r build",
+    "build:packages": "pnpm -r --filter \"@card3d/*\" build",
+    "pack:all": "pnpm -r --filter \"@card3d/*\" exec pnpm pack",
+    "pack:check": "node scripts/check-pack.mjs",
+    "changeset": "changeset",
+    "version": "changeset version && node scripts/skill-versions.mjs",
+    "release": "pnpm build:packages && pnpm pack:check && node scripts/publish-if-needed.mjs",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "notices": "node scripts/third-party-rust.mjs",
+    "check:notices": "node scripts/third-party-rust.mjs --check",
+    "check:licenses": "cargo deny --offline check licenses",
+    "skills:refs": "node scripts/skill-references.mjs",
+    "skills:stale": "intent stale",
+    "check:skills": "node scripts/skill-references.mjs --check && intent validate",
+    "check:rust": "sh scripts/check-rust.sh",
+    "lint": "oxlint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "knip": "knip",
+    "depcruise": "depcruise packages apps scripts crates/card3d-tools crates/card3d-web/web",
+    "deps:outdated": "ncu",
+    "deps:update": "ncu -u && pnpm install",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm knip && pnpm depcruise && pnpm check:notices && pnpm check:skills && pnpm -r test",
+    "e2e": "pnpm --filter card-studio e2e",
+    "finish": "node apps/studio/finish/cli.mjs"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
+    "@tanstack/intent": "0.5.6",
+    "dependency-cruiser": "18.8.0",
+    "knip": "6.46.1",
+    "npm-check-updates": "23.1.1",
+    "oxfmt": "0.79.0",
+    "oxlint": "1.94.0",
+    "typescript": "^7.0.2"
+  },
+  "packageManager": "pnpm@12.21.0"
+}

@@ -1,0 +1,11 @@
+{
+  "recipe": {
+    "material": "titanium",
+    "texture": "brushed",
+    "color": "#2c2f33"
+  },
+  "cardholderName": "Ada Lovelace",
+  "edge": {
+    "finish": "match"
+  }
+}

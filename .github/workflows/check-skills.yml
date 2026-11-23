@@ -1,0 +1,186 @@
+# Check Skills: TanStack Intent's checks for the agent skills the @card3d packages ship
+# (packages/*/skills/, planning records in _artifacts/, review records in .intent/review-state.json).
+#
+# intent-workflow-version: 6
+#
+# Adapted from the workflow `intent maintainer setup` copies (that template version, @tanstack/intent
+# 0.5.6). The template calls TanStack/intent's reusable check-skills.yml and review-skills.yml for the
+# two analysis jobs; they install pnpm with `corepack enable`, which Node 25+ no longer ships, and default
+# to Node 22, so the same steps run here on this repository's toolchain (pnpm from packageManager, Node
+# 26) with the template's posture: read-only token, no persisted credentials, dependencies installed
+# without lifecycle scripts, Intent from the lockfile. The opt-in review-PR publisher is still TanStack's
+# reusable workflow, pinned to the commit of the Intent release (dist/workflow-ref.json); bump that pin
+# with the @tanstack/intent devDependency, together.
+#
+# Nothing here needs the engine's wasm builds: `intent validate` typechecks the skills' examples against
+# the workspace sources.
+#
+#   validate        pull requests: `intent maintainer check --base <PR base>`: every skill valid, generated
+#                   metadata in sync, no authoring markers, and a recorded review for every change to a
+#                   skill, its sources, the planning records or an unmapped path (skill_tree.yaml's
+#                   review.ignore lists the paths that can't affect the skills). Fails when a review is
+#                   missing: record it with `pnpm exec intent maintainer review` (AGENTS.md, DEPLOY.md).
+#                   Also turns `intent stale`'s version-drift report into warnings.
+#   review          manual runs (and releases published by a person; the Release workflow's own GitHub
+#                   Releases use GITHUB_TOKEN, which starts no workflows): a read-only report of guidance
+#                   due for review, uploaded as the intent-review-report artifact.
+#   publish-review  only when the repository variable INTENT_REVIEW_PULL_REQUESTS is "true": TanStack's
+#                   publisher opens a "Review intent skills" PR from that report (an empty commit and the
+#                   report as data; no checkout, no install, no Intent run). Off by default.
+name: Check Skills
+
+on:
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: check-skills-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: "26"
+  # The planning record directory `intent maintainer setup` chose.
+  INTENT_ARTIFACTS: _artifacts
+
+jobs:
+  validate:
+    name: Validate intent skills
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The review compares against the PR base and the recorded baseline: full history.
+          fetch-depth: 0
+          persist-credentials: false
+      # The pnpm version comes from package.json's packageManager field.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - name: Install (no lifecycle scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # As the template's `repair: true`: apply Intent's mechanical repairs and `maintainer sync` to a clean
+      # checkout, and fail with the resulting patches (the intent-repairs artifact) when they change anything.
+      # Nothing is committed or pushed.
+      - name: Prepare repairs
+        id: repairs
+        continue-on-error: true
+        run: |
+          DIRECTORY=$(mktemp -d "$RUNNER_TEMP/intent-repairs.XXXXXX")
+          echo "directory=$DIRECTORY" >> "$GITHUB_OUTPUT"
+          git -c core.fsmonitor=false rev-parse HEAD > "$DIRECTORY/base-sha.txt"
+          if [ -n "$(git -c core.fsmonitor=false status --porcelain --untracked-files=all)" ]; then
+            echo "::error::Repair patches require a clean checkout after dependency installation."
+            exit 1
+          fi
+          status=0
+          pnpm exec intent repair --write --json > "$DIRECTORY/repair-report.json" || status=1
+          pnpm exec intent maintainer sync --artifacts "$INTENT_ARTIFACTS" > "$DIRECTORY/sync.log" 2>&1 || status=1
+          git -c core.fsmonitor=false add --intent-to-add -- .
+          git -c core.fsmonitor=false diff --no-ext-diff --no-textconv --binary HEAD > "$DIRECTORY/mechanical.patch"
+          # Suggestions only (applies after mechanical.patch); they need assessing, not applying blindly.
+          pnpm exec intent repair --patch > "$DIRECTORY/example-suggestions.patch" || status=1
+          if [ -s "$DIRECTORY/mechanical.patch" ]; then
+            echo "pending=true" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$status"
+
+      - name: Check skills
+        env:
+          INTENT_REVIEW_BASE: ${{ github.event.pull_request.base.sha }}
+        run: pnpm exec intent maintainer check --base "$INTENT_REVIEW_BASE" --github-summary --artifacts "$INTENT_ARTIFACTS"
+
+      # `intent stale` exits 0 on drift; surface it. Version drift means a release set no library_version
+      # (scripts/skill-versions.mjs skips it while reviews are pending).
+      - name: Version drift (intent stale)
+        if: ${{ !cancelled() }}
+        run: |
+          pnpm exec intent stale --json > "$RUNNER_TEMP/stale.json"
+          node --input-type=module - "$RUNNER_TEMP/stale.json" <<'NODE'
+          import { readFileSync } from "node:fs";
+          const report = JSON.parse(readFileSync(process.argv[2], "utf8"));
+          let n = 0;
+          for (const lib of report) {
+            if (lib.versionDrift) { n++; console.log(`::warning title=Skill version drift::${lib.library}: skills target ${lib.skillVersion}, the package is ${lib.currentVersion} (${lib.versionDrift}). Review the guidance, then node scripts/skill-versions.mjs.`); }
+            for (const s of lib.skills ?? []) if (s.needsReview) { n++; console.log(`::warning title=Skill needs review::${lib.library}#${s.name}: ${(s.reasons ?? []).join("; ")}`); }
+            for (const signal of lib.signals ?? []) { n++; console.log(`::warning title=Intent signal::${lib.library}: ${JSON.stringify(signal)}`); }
+          }
+          console.log(n ? `${n} warning(s)` : "no drift");
+          NODE
+
+      - name: Save repair patches
+        if: always() && steps.repairs.outputs.directory != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: intent-repairs
+          path: ${{ steps.repairs.outputs.directory }}
+          if-no-files-found: error
+          retention-days: 7
+      - name: Require repair review
+        if: always() && steps.repairs.outcome != 'skipped'
+        env:
+          REPAIR_PENDING: ${{ steps.repairs.outputs.pending }}
+          REPAIR_OUTCOME: ${{ steps.repairs.outcome }}
+        run: |
+          if [ "$REPAIR_PENDING" = true ] || [ "$REPAIR_OUTCOME" != success ]; then
+            echo "::error::Review the intent-repairs artifact. Apply mechanical.patch first; assess example-suggestions.patch separately. Resolve remaining checks before merging."
+            exit 1
+          fi
+
+  review:
+    name: Check intent skill coverage
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      has-review: ${{ steps.review.outputs.has_review }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - name: Install (no lifecycle scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      # Writes review-items.json and has_review=true when guidance is due for review.
+      - name: Check skills
+        id: review
+        run: |
+          if [ -f .intent/review-state.json ]; then
+            pnpm exec intent review --github-review --package-label card3d-workspace
+          else
+            pnpm exec intent stale --github-review --package-label card3d-workspace
+          fi
+      - name: Save review report
+        if: steps.review.outputs.has_review == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: intent-review-report
+          path: review-items.json
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-review:
+    needs: review
+    if: vars.INTENT_REVIEW_PULL_REQUESTS == 'true' && needs.review.outputs.has-review == 'true'
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: TanStack/intent/.github/workflows/publish-skill-review.yml@b9f205d69ba2bec93954508ff76281ae2178062c # v0.5.6

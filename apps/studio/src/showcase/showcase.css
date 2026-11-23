@@ -1,0 +1,473 @@
+/*
+ * card3d showcase: a hero marquee — a drifting arc of cards over a soft gradient, a
+ * wordmark that blurs in, and a scroll morph that shrinks the hero into the first grid tile.
+ */
+:root {
+  /* The self-hosted Inter (registered by the page script), then the platform face. */
+  --sc-font: "card3d Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sc-gutter: 96px;
+  --sc-viewport-aspect: 16 / 10;
+  /* --sc-backdrop / --sc-page come from the lighting preset (main.ts); these are the light tone's. */
+  --sc-backdrop: radial-gradient(120% 110% at 50% 40%, #ffffff 0%, #d5d8df 100%);
+  --sc-page: #d5d8df;
+  --sc-ink: #0b0c0e;
+  --sc-wordmark: #0b0c0ee0;
+  --sc-muted: #50545c;
+  --sc-cell: rgba(255, 255, 255, 0.55);
+  --sc-line: rgba(0, 0, 0, 0.08);
+  --sc-nav-bg: rgba(240, 241, 244, 0.72);
+  color-scheme: light;
+}
+.sc-root[data-tone="dark"] {
+  --sc-ink: #f4f4f6;
+  --sc-wordmark: #f4f4f6;
+  --sc-muted: #a3a6b0;
+  --sc-cell: rgba(255, 255, 255, 0.045);
+  --sc-line: rgba(255, 255, 255, 0.08);
+  --sc-nav-bg: rgba(10, 10, 14, 0.62);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--sc-page);
+  font-family: var(--sc-font);
+}
+body {
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: inherit;
+}
+
+/* ── scroll container ──────────────────────────────────────────── */
+.sc-root {
+  position: absolute;
+  inset: 0;
+  color: var(--sc-ink);
+  background: var(--sc-page);
+  transition: background-color 0.4s ease;
+  overflow: hidden auto;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+}
+.sc-root::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── nav ───────────────────────────────────────────────────────────────── */
+.sc-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 clamp(20px, 4vw, var(--sc-gutter));
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  transition:
+    opacity 0.35s cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+/* Once the page scrolls under it, the nav gets a frosted bar so cards and text never run through it. */
+.sc-root[data-handedoff] .sc-nav {
+  background: var(--sc-nav-bg);
+  box-shadow: 0 1px 0 var(--sc-line);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+}
+.sc-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+.sc-nav__mark {
+  width: 17px;
+  height: 20px;
+  fill: currentColor;
+}
+.sc-nav__links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.sc-nav__links a {
+  text-decoration: none;
+  color: var(--sc-muted);
+}
+.sc-nav__links a:hover {
+  color: var(--sc-ink);
+}
+.sc-nav__links a.sc-nav__cta {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--sc-ink);
+  color: var(--sc-page);
+  font-weight: 600;
+}
+.sc-nav__links a.sc-nav__cta:hover {
+  color: var(--sc-page);
+  opacity: 0.88;
+}
+.sc-root[data-marquee-intro="arrive"] .sc-nav,
+.sc-root[data-intro-ui="waiting"] .sc-nav {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── hero (morph / flow) ───────────────────────────────────── */
+.sc-hero {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 2;
+  overflow: hidden;
+  transform-origin: 0 0;
+  contain: layout paint style;
+  background: var(--sc-page);
+  transition: background-color 0.4s ease;
+  --marquee-touch-action: none;
+}
+.sc-root--flow .sc-hero {
+  position: relative;
+  width: 100%;
+  height: 100svh;
+  --marquee-touch-action: pan-y pinch-zoom;
+}
+.sc-scrub {
+  height: 56vh;
+}
+.sc-root--flow .sc-scrub {
+  display: none;
+}
+
+/* ── marquee frame ───────────────────────────────────────────────── */
+.card-marquee {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  pointer-events: none;
+}
+.card-marquee__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--sc-backdrop);
+}
+.card-marquee__stage {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  animation: sc-stage-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.card-marquee__stage canvas {
+  pointer-events: auto;
+}
+.card-marquee[data-intro="arrive"] .card-marquee__bg {
+  animation: sc-bg-in 0.7s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes sc-stage-in {
+  from {
+    opacity: 0;
+    transform: translateY(2.5%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sc-bg-in {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.card-marquee__headline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: clamp(3rem, 6vh, 4.5rem);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 18px;
+  padding-inline: var(--sc-gutter);
+  container-type: inline-size;
+  pointer-events: none;
+}
+.card-marquee__title {
+  margin: 0;
+  width: 100%;
+  font-size: min(148px, 8.5cqi);
+  line-height: 0.82;
+  letter-spacing: -0.055em;
+  font-weight: 650;
+  color: var(--sc-wordmark);
+  text-align: left;
+  white-space: nowrap;
+  will-change: opacity, transform;
+}
+.card-marquee__tagline {
+  margin: 0;
+  max-width: 34ch;
+  font-size: clamp(15px, 1.35cqi, 19px);
+  line-height: 1.45;
+  color: var(--sc-muted);
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 0.6s ease 0.1s,
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s;
+}
+.sc-root[data-intro-ui="done"] .card-marquee__tagline {
+  opacity: 1;
+  transform: none;
+}
+/* Desktop morph: the headline goes once the hero has landed in its tile. (Flow mode keeps it: the hero
+   simply scrolls away.) */
+.sc-root:not(.sc-root--flow)[data-landed] .card-marquee__headline {
+  visibility: hidden;
+  opacity: 0;
+}
+
+/* Lighting switcher (hero, bottom right) */
+.sc-lighting {
+  position: absolute;
+  right: var(--sc-gutter);
+  bottom: clamp(3rem, 6vh, 4.5rem);
+  z-index: 4;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--sc-nav-bg);
+  box-shadow: inset 0 0 0 1px var(--sc-line);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.6s ease 0.2s;
+}
+.sc-root[data-intro-ui="done"] .sc-lighting {
+  opacity: 1;
+}
+.sc-root:not(.sc-root--flow)[data-landed] .sc-lighting {
+  visibility: hidden;
+  opacity: 0;
+}
+/* Flow mode: the hero's backdrop melts into the page below it. */
+.sc-root--flow .card-marquee__bg {
+  background: linear-gradient(to bottom, transparent 62%, var(--sc-page)), var(--sc-backdrop);
+}
+.sc-lighting__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px 6px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sc-muted);
+  font: 500 13px/1 var(--sc-font);
+  cursor: pointer;
+}
+.sc-lighting__btn:hover {
+  color: var(--sc-ink);
+}
+.sc-lighting__btn.is-on {
+  background: var(--sc-cell);
+  color: var(--sc-ink);
+  box-shadow: inset 0 0 0 1px var(--sc-line);
+}
+.sc-lighting__sw {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.45);
+}
+
+/* wordmark blur-in */
+.card-marquee__wordmark-character {
+  display: inline-block;
+  transform-origin: 50% 55%;
+  opacity: 0;
+  filter: blur(12px);
+  transform: translateY(9.28px);
+  color: var(--sc-wordmark);
+}
+.sc-root[data-intro-ui="wordmark"] .card-marquee__wordmark-character {
+  animation: sc-letter 0.648s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--wordmark-i) * 18ms);
+}
+.sc-root[data-intro-ui="done"] .card-marquee__wordmark-character {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+@keyframes sc-letter {
+  0% {
+    opacity: 0;
+    filter: blur(12px);
+    transform: translateY(9.28px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+body.card-marquee-scrubbing,
+body.card-marquee-scrubbing * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+/* ── page content ──────────────────────────────────────────────────────── */
+.sc-stage {
+  position: relative;
+  z-index: 1;
+  padding: 88px var(--sc-gutter) 48px;
+}
+.sc-root--flow .sc-stage {
+  padding-top: 48px;
+  opacity: 1 !important;
+}
+.sc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.sc-cell {
+  border-radius: 20px;
+  background: var(--sc-cell);
+  box-shadow: inset 0 0 0 1px var(--sc-line);
+  padding: 28px;
+  min-height: 200px;
+}
+.sc-cell h2 {
+  margin: 0 0 10px;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.sc-cell p {
+  margin: 0;
+  color: var(--sc-muted);
+  line-height: 1.5;
+  max-width: 46ch;
+}
+.sc-cell code {
+  font-size: 0.92em;
+}
+.sc-cell--lead {
+  grid-column: 1 / -1;
+  aspect-ratio: var(--sc-viewport-aspect);
+  padding: 0;
+  min-height: 0;
+  background: transparent;
+}
+.sc-root--flow .sc-cell--lead {
+  display: none;
+}
+.sc-footer {
+  margin-top: 48px;
+  color: var(--sc-muted);
+  font-size: 13px;
+}
+.sc-footer a {
+  color: inherit;
+}
+
+/* ── compact (≤720 px) ─────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  :root {
+    --sc-gutter: 24px;
+  }
+  .card-marquee__headline {
+    bottom: calc(4.5vh + env(safe-area-inset-bottom, 0px));
+    padding-inline: max(var(--sc-gutter), env(safe-area-inset-left, 0px));
+  }
+  .card-marquee__title {
+    font-size: min(100px, 19cqi);
+    line-height: 0.9;
+    letter-spacing: -0.05em;
+    white-space: normal;
+    text-wrap: balance;
+  }
+  .card-marquee__headline {
+    gap: 12px;
+  }
+  .sc-grid {
+    grid-template-columns: 1fr;
+  }
+  .sc-nav__links {
+    gap: 16px;
+  }
+  .sc-nav__links a:not(.sc-nav__cta):not([href="#work"]) {
+    display: none;
+  }
+  .sc-nav__links a.sc-nav__cta {
+    padding: 7px 12px;
+  }
+  /* The switcher becomes a 3 × 2 grid under the nav: every preset visible, nothing overflows. */
+  .sc-lighting {
+    left: var(--sc-gutter);
+    right: var(--sc-gutter);
+    bottom: auto;
+    top: 76px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-radius: 18px;
+  }
+  .sc-lighting__btn {
+    justify-content: flex-start;
+    min-width: 0;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 720px) and (max-height: 700px) {
+  .card-marquee__headline {
+    bottom: calc(3vh + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-marquee__stage,
+  .card-marquee__bg,
+  .card-marquee__wordmark-character {
+    animation: none !important;
+  }
+  .card-marquee__wordmark-character {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+  .card-marquee__tagline,
+  .sc-lighting {
+    transition: none;
+  }
+}

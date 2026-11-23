@@ -1,0 +1,9 @@
+# Build output of build-xcframework.sh
+/Card3DFFI.xcframework/
+/Sources/Card3D/Resources/environments/
+/Sources/Card3D/Resources/THIRD_PARTY_NOTICES.md
+# SwiftPM and Xcode
+/.build/
+/.swiftpm/
+xcuserdata/
+*.xcuserstate

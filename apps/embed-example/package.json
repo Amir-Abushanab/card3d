@@ -1,0 +1,14 @@
+{
+  "name": "card3d-embed-example",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Minimal pages embedding <metal-card> from the built CDN bundle (and the e2e fixture for it)",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "serve": "node serve.mjs"
+  },
+  "devDependencies": {
+    "@card3d/element": "workspace:*"
+  }
+}

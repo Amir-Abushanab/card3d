@@ -1,0 +1,84 @@
+# cargo-deny (https://embarkstudios.github.io/cargo-deny/), over every crate any of our builds can
+# compile in. scripts/check-rust.sh runs `cargo deny --offline check licenses bans sources` (and
+# `advisories` when online: it needs the RustSec database); CI's rust job runs all four.
+#
+# licenses: every crate must be under one of the licences below. Anything else, copyleft included (GPL,
+# AGPL, LGPL, MPL, EPL, CDDL, ...), fails the check. A new licence needs a look at its terms and a
+# section in THIRD_PARTY_NOTICES.md (node scripts/third-party-rust.mjs) before it goes here.
+[graph]
+# The distributed builds' targets (the web builds; apple/build-xcframework.sh; android/build.sh).
+targets = [
+    "wasm32-unknown-unknown",
+    "aarch64-apple-ios",
+    "aarch64-apple-ios-sim",
+    "aarch64-apple-darwin",
+    "aarch64-linux-android",
+    "x86_64-linux-android",
+]
+all-features = true
+
+[licenses]
+allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib", "Unicode-3.0"]
+confidence-threshold = 0.93
+exceptions = [
+    # A dependency of wasm_split_helpers' procedural macro: runs at build time, nothing of it ships.
+    { crate = "base16", allow = ["CC0-1.0"] },
+]
+
+[licenses.private]
+# The workspace's own crates (publish = false; MIT, see LICENSE).
+ignore = true
+
+# bans: what may be in the graph at all. Which crate may depend on which of ours (the engine on no
+# host, the web build on nothing validate-only, ...) is scripts/check-rust-layers.mjs.
+[bans]
+# Two versions of a crate is a warning (they cost build time, and on the web download size); the
+# ones below are known and wait on upstream.
+multiple-versions = "warn"
+# A `*` requirement can pull any future version; path dependencies between our own crates are fine.
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+deny = [
+    # The engine reads JSON with its own reader (crates/card3d-engine/src/json.rs) since serde cost the
+    # web build's main module too much. serde_json is the tools' (and the engine's tests' oracle);
+    # scripts/check-rust-layers.mjs checks that no serde reaches a shipped build.
+    { crate = "serde_json", wrappers = ["card3d-tools", "card3d-engine"], reason = "keep serde out of the shipped builds" },
+]
+skip = [
+    # The window viewer (card3d-tools' winit 0.30) and its macOS / iOS / Linux / Android stack, one
+    # major version behind wgpu's and jni's.
+    { crate = "bitflags@1.3.2", reason = "winit 0.30's core-graphics" },
+    { crate = "block2@0.5.1", reason = "winit 0.30's objc2 0.5" },
+    { crate = "objc2@0.5.3", reason = "winit 0.30" },
+    { crate = "objc2-foundation@0.2.2", reason = "winit 0.30" },
+    { crate = "jni-sys@0.3.1", reason = "winit 0.30's ndk; card3d-ffi's jni 0.22 uses jni-sys 0.4" },
+    { crate = "thiserror@1.0.69", reason = "winit 0.30's calloop (Linux)" },
+    { crate = "thiserror-impl@1.0.69", reason = "thiserror 1" },
+    # wgpu's allocator (gpu-allocator 0.28) is a hashbrown behind the rest of wgpu.
+    { crate = "hashbrown@0.16.1", reason = "gpu-allocator 0.28 (wgpu-hal)" },
+    # png 0.18 (the image crate's and the tools') is on miniz_oxide 0.8; flate2 on 0.9.
+    { crate = "miniz_oxide@0.8.9", reason = "png 0.18" },
+    # Procedural macros on syn 2 (jni's) and syn 3 (bytemuck_derive's): build time only.
+    { crate = "syn@2.0.119", reason = "jni's macros; build time only" },
+]
+
+# sources: crates come from crates.io only (no git dependencies, no other registries).
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+
+# advisories: RustSec (vulnerable, unsound, unmaintained or yanked crates). Needs the advisory
+# database, so scripts/check-rust.sh runs it only online; CI always.
+[advisories]
+yanked = "deny"
+ignore = [
+    # ab_glyph's font parser (native text only: the web draws text with the browser's Canvas 2D). No
+    # maintained drop-in yet: skrifa is a different API, and ab_glyph has not moved to it.
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser unmaintained: ab_glyph's parser, no drop-in replacement yet" },
+    # url 2.5.8: `Url::origin()` recursion on nested `blob:` URLs. The validator (feature `validate`)
+    # never calls `origin()`. url 2.5.9 fixes it and clears the three-day cooldown on 2026-11-24
+    # (node scripts/rust-outdated.mjs --upgrade); drop this entry then.
+    { id = "RUSTSEC-2026-0592", reason = "the validator never calls Url::origin(); 2.5.9 after its cooldown" },
+]

@@ -1,0 +1,51 @@
+{
+  "$schema": "./node_modules/knip/schema-jsonc.json",
+  // Each package's `exports` map (pointing at src/) is its public API, so those modules are entries and
+  // their exports never count as unused. Vite, Vitest, Playwright and tsdown configs, tests and the
+  // pages Vite builds come in through knip's plugins; the entries below are the rest.
+  "workspaces": {
+    ".": {
+      // .ncurc.cjs: npm-check-updates' config (pnpm deps:outdated / deps:update).
+      "entry": ["scripts/*.mjs", ".ncurc.cjs"],
+      // build-environments.mjs shells out to libwebp's cwebp (a system tool, only for regenerating the HDRIs).
+      "ignoreBinaries": ["cwebp"],
+    },
+    "packages/core": {
+      // wasm/*.js: the engine's loader, marquee, AR and GIF-sticker page sides (shipped beside dist/,
+      // imported by literal path); build/: the standalone bundles' helpers; dev/: the dev server's
+      // local-pack plugin.
+      "entry": ["wasm/*.js", "build/*.mjs", "dev/*.mjs"],
+      // The packages ship agent skills: Intent's packaging check (intent validate) expects it in their devDependencies.
+      "ignoreDependencies": ["@tanstack/intent"],
+    },
+    "packages/element": {
+      "ignoreDependencies": ["@tanstack/intent"],
+    },
+    "packages/react": {
+      "ignoreDependencies": ["@tanstack/intent"],
+    },
+    "apps/studio": {
+      "entry": ["finish/preview.ts"],
+      // tweakpane's types re-export @tweakpane/core without declaring it (pnpm-workspace.yaml's packageExtensions).
+      "ignoreDependencies": ["@tweakpane/core"],
+    },
+    "apps/embed-example": {
+      // serve.mjs serves the element's built bundle from packages/element/dist; the dependency orders the builds.
+      "ignoreDependencies": ["@card3d/element"],
+    },
+    "crates/card3d-tools": {
+      "entry": ["*.mjs", "*.ts", "ref/*.ts", "designs/*.ts"],
+      // compare.mjs / ar-compare.mjs load vite through createRequire, and the local three.js archive's tests
+      // run on this package's vitest (three-archive.mjs links its node_modules here). @three-engine/* is the
+      // archive's alias (three-archive.mjs), absent in a fresh clone.
+      "ignoreDependencies": ["vite", "vitest", "@three-engine/.+"],
+    },
+  },
+  // @archive: exports the local three.js archive (.archive/three-engine, gitignored) imports from the live
+  // tree, which compare.mjs runs when it's there. @ported: kept because the Rust port cites it.
+  "tags": ["-archive", "-ported"],
+  "ignoreIssues": {
+    // `MetalCard` is both the named and the default export, on purpose.
+    "packages/react/src/index.tsx": ["duplicates"],
+  },
+}

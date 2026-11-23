@@ -1,0 +1,5 @@
+{
+  "recipe": { "material": "glass", "color": "#c5dde4", "polish": 70 },
+  "cardholderName": "Ada Lovelace",
+  "addons": { "shine": { "intensity": 0.7, "time": 7.5 } }
+}

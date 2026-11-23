@@ -1,0 +1,15 @@
+{
+  "recipe": { "material": "silver", "texture": "none", "grain": 0, "relief": 0, "polish": 80, "color": "#dcd8ce" },
+  "cardholderName": "Katherine Johnson Who Computed The Trajectories",
+  "frontLayout": { "nameFontHeight": 0.06, "nameBottom": 0.12 },
+  "finish": { "name": "embossed" },
+  "contactless": { "finish": "etched", "scale": 0.5 },
+  "logo": {
+    "path": "M10 0L20 10L10 20L0 10ZM10 5L15 10L10 15L5 10Z",
+    "viewBox": [20, 20],
+    "fillRule": "evenodd",
+    "position": "top-right",
+    "scale": 1.6
+  },
+  "textLines": [{ "text": "Centre line", "placement": "center", "align": "center", "size": 1.4, "tracking": -0.02 }]
+}

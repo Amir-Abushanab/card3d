@@ -1,0 +1,3 @@
+# clippy (the lint levels are in Cargo.toml's [workspace.lints]).
+# Tests may print (a skipped GPU test says so).
+allow-print-in-tests = true

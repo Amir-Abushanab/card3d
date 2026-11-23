@@ -1,0 +1,20 @@
+{
+  "recipe": {
+    "material": "silver",
+    "texture": "brushed",
+    "color": "#c9cdd2"
+  },
+  "cardholderName": "Ada Lovelace",
+  "shape": {
+    "cutouts": [
+      "lanyard",
+      "notch",
+      "window"
+    ]
+  },
+  "edge": {
+    "finish": "anodized",
+    "color": "#1f9d6b",
+    "chamfer": true
+  }
+}

@@ -1,0 +1,158 @@
+# Release: publishes the @card3d packages to npm when main carries versions npm doesn't have (a merged
+# "chore: version packages" PR, which version.yml opens), tags them (@card3d/core@x.y.z, …) and cuts
+# GitHub Releases. It never versions.
+#
+# It runs after CI finishes on a push to main, and only when that run passed: everything CI checks (Rust,
+# the web builds' size budgets, typecheck, skills, unit and e2e tests, pack) gates the one step that
+# can't be taken back. It publishes exactly the commit CI tested, with the engine's wasm builds CI built
+# (the engine-wasm artifact; packages/core/wasm/pkg* is gitignored), so nothing is rebuilt from Rust here.
+# To retry a failed publish, re-run this run (same commit, same artifact, kept 14 days) or re-run CI's
+# run for that commit.
+#
+# Auth is npm trusted publishing (OIDC, id-token: write; provenance attached), no stored token.
+# One-time setup, DEPLOY.md: npm can't do a package's FIRST publish over OIDC, so the first release goes
+# from a laptop (`pnpm release`), then each package gets a Trusted Publisher (this repository,
+# workflow release.yml). Until the packages exist on npm the gate skips publishing, so runs stay green.
+#
+# changesets/action@v2: it reads the CHANGESETS_OUTPUT file scripts/publish-if-needed.mjs writes (v1
+# grepped stdout for "New tag:" lines, which the changesets v3 CLI doesn't always print).
+name: Release
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+# One publish at a time, and never cancel one in progress: a run cancelled mid-publish can leave packages
+# on npm without their tags or GitHub Releases. A pending run is only ever replaced by a newer main's,
+# which publishes whatever versions npm still lacks.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "26"
+
+jobs:
+  preflight:
+    name: Publish gate
+    # A passing CI run for a push to main of this repository (the branch filter alone would also match a
+    # fork's pull request from a branch named main).
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.gate.outputs.publish }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+          sparse-checkout: packages
+      # publish=true when a public package's version in this commit is missing from npm, the packages
+      # already exist there (else the first publish is a laptop's), and it isn't the 0.0.0 placeholder.
+      - id: gate
+        run: |
+          set -euo pipefail
+          missing=()
+          placeholder=()
+          on_npm=0
+          for f in packages/*/package.json; do
+            [ "$(jq -r '.private // false' "$f")" = true ] && continue
+            name=$(jq -r .name "$f")
+            version=$(jq -r .version "$f")
+            [ "$version" = 0.0.0 ] && placeholder+=("$name")
+            if out=$(npm view "$name" versions --json 2>"$RUNNER_TEMP/npm-err"); then
+              on_npm=$((on_npm + 1))
+              jq -e --arg v "$version" '(if type == "array" then . else [.] end) | index($v) != null' <<<"$out" >/dev/null ||
+                missing+=("$name@$version")
+            elif grep -q E404 "$RUNNER_TEMP/npm-err"; then
+              missing+=("$name@$version")
+            else
+              cat "$RUNNER_TEMP/npm-err" >&2
+              exit 1
+            fi
+          done
+          if [ ${#missing[@]} -eq 0 ]; then
+            echo "::notice::Every package version in this commit is on npm: nothing to publish."
+          elif [ ${#placeholder[@]} -gt 0 ]; then
+            echo "::notice::${placeholder[*]} still at the 0.0.0 placeholder: merge the Version Packages PR first."
+          elif [ "$on_npm" -eq 0 ]; then
+            echo "::notice::@card3d/* is not on npm yet, and npm can't do a first publish over OIDC: publish ${missing[*]} from a laptop, then add the Trusted Publishers (DEPLOY.md)."
+          else
+            echo "::notice::To publish: ${missing[*]}"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    name: Publish to npm
+    needs: preflight
+    if: needs.preflight.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write # the release tags and GitHub Releases
+      id-token: write # npm trusted publishing (OIDC) and provenance
+      actions: read # the CI run's engine-wasm artifact
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          # changesets/action pushes the tags with its own token (push-with-git-cli below).
+          persist-credentials: false
+      # The engine's web builds from the CI run that passed for this commit.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: engine-wasm
+          path: packages/core/wasm
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      # The pnpm version comes from package.json's packageManager field.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # npm trusted publishing needs npm 11.5.1 or later (Node 26 ships a newer one).
+      - name: npm supports trusted publishing
+        run: |
+          npm --version
+          node -e 'const [a, b, c] = process.argv[1].split(".").map(Number); if (a < 11 || (a === 11 && (b < 5 || (b === 5 && c < 1)))) { console.error("npm " + process.argv[1] + " is too old for trusted publishing (11.5.1+)"); process.exit(1); }' "$(npm --version)"
+      # The merge commit can still carry changesets: ones merged after the Version PR was last updated.
+      # changesets/action would then go to version mode and publish nothing. They only drive versioning
+      # (the next Version PR picks them up) and ship in no package, so drop them from this checkout.
+      - name: Set aside changesets for the next Version PR
+        run: |
+          set -euo pipefail
+          for f in .changeset/*.md; do
+            [ -e "$f" ] && [ "$(basename "$f")" != README.md ] || continue
+            echo "::notice::$f is pending; the next Version PR versions it"
+            rm "$f"
+          done
+      # Structural check of the skills about to ship (CI ran it too, in pnpm check).
+      - run: pnpm exec intent validate
+      - name: Publish
+        id: changesets
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          # build:packages + pack:check + scripts/publish-if-needed.mjs (only versions npm lacks; each
+          # published package's tag is created in this checkout and reported through CHANGESETS_OUTPUT).
+          publish-script: pnpm release
+          # Push this checkout's tags (at the commit CI tested). Through the API the action would tag
+          # GITHUB_SHA, which under workflow_run is main's tip at the time, possibly a later commit.
+          push-with-git-cli: true
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+          # Fallback if OIDC publishing misbehaves: add a granular NPM_TOKEN secret, give setup-node
+          # `registry-url: https://registry.npmjs.org` (it writes the .npmrc that reads this) and uncomment.
+          # NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

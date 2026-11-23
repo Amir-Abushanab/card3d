@@ -1,0 +1,1 @@
+{"recipe": {"material": "silver", "texture": "brushed", "color": "#8d949c"}, "cardholderName": "Ada Lovelace", "shaders": [{"id": "liquid-metal", "side": "both", "target": "skin", "params": {"mask": 1, "speed": 2, "tint": "#a0c0ff", "repetition": 5, "shiftRed": 0.4, "angle": 30, "scale": 0.9, "rotation": 20, "offset": [0.05, -0.03], "avoidChip": false}}]}

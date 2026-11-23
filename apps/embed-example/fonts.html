@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>metal-card: custom fonts</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; background: #0b0b10; color: #e8e8ee; font: 15px/1.55 system-ui, sans-serif; }
+      main { max-width: 1040px; margin: 0 auto; padding: 40px 16px 80px; }
+      h1 { font-size: 26px; margin: 0 0 4px; }
+      p { margin: 0 0 16px; color: #a6a6b4; max-width: 70ch; }
+      code { color: #e8c27a; }
+      .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+      figure { margin: 0; width: 360px; }
+      figcaption code { word-break: break-all; }
+      figcaption { margin-top: 8px; font-size: 13px; color: #8a8a98; }
+      metal-card { width: 360px; }
+    </style>
+    <script type="module" src="/npm/@card3d/element/dist/standalone/metal-card.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Custom fonts</h1>
+      <p>
+        Besides the built-in fonts, <code>font</code> takes any Google Fonts family as <code>google:&lt;Family&gt;[@weight]</code>,
+        and <code>font-url</code> a web font file (https or this site's own path) named by <code>font</code>. A font that can't be
+        loaded falls back to Inter and fires <code>metal-card-error</code>.
+      </p>
+      <div class="row">
+        <figure>
+          <metal-card id="url-font" material="titanium" texture="brushed" name="Katherine Johnson" font="Chakra Petch" font-url="fonts/chakra-petch-700-latin.woff2"></metal-card>
+          <figcaption><code>font="Chakra Petch" font-url="fonts/chakra-petch-700-latin.woff2"</code> (SIL OFL, see <code>fonts/OFL.txt</code>)</figcaption>
+        </figure>
+        <figure>
+          <metal-card id="google-font" material="brass" texture="guilloche" pattern="orbit" name="Hedy Lamarr" font="google:Fraunces@600"></metal-card>
+          <figcaption><code>font="google:Fraunces@600"</code> (loaded from fonts.googleapis.com)</figcaption>
+        </figure>
+      </div>
+    </main>
+  </body>
+</html>

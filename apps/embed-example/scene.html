@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>metal-card: scenes and AR</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; background: #0b0b10; color: #e8e8ee; font: 15px/1.55 system-ui, sans-serif; }
+      main { max-width: 1040px; margin: 0 auto; padding: 40px 16px 80px; }
+      h1 { font-size: 26px; margin: 0 0 4px; }
+      p { margin: 0 0 16px; color: #a6a6b4; max-width: 70ch; }
+      code { color: #e8c27a; }
+      .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+      figure { margin: 0; }
+      figcaption { margin-top: 8px; font-size: 13px; color: #8a8a98; }
+      metal-card { width: 420px; aspect-ratio: 4 / 3; border-radius: 14px; }
+    </style>
+    <script type="module" src="/npm/@card3d/element/dist/standalone/metal-card.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Scenes and AR</h1>
+      <p>
+        <code>environment</code> lights the card with an HDRI (one of the bundled ids, or a <code>.hdr</code> URL) and
+        <code>floor</code> stands it on a reflective floor with a contact shadow. Both load on first use, from a chunk
+        next to the bundle. <code>ar</code> adds a View in AR button where the device has an AR viewer (iPhone, iPad;
+        Android with <code>ar-src</code>, a hosted .glb); the exporter loads only when it is tapped.
+      </p>
+      <div class="row">
+        <figure>
+          <metal-card id="staged" environment="softbox" floor ar backdrop lighting="dark" material="silver" texture="guilloche" pattern="orbit" name="Ada Lovelace"></metal-card>
+          <figcaption><code>environment="softbox" floor ar</code></figcaption>
+        </figure>
+        <figure>
+          <metal-card id="sunset" environment="sunset" floor="0.7" material="brass" color="#cda874" name="Grace Hopper"></metal-card>
+          <figcaption><code>environment="sunset" floor="0.7"</code></figcaption>
+        </figure>
+      </div>
+    </main>
+  </body>
+</html>

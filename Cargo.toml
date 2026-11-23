@@ -1,0 +1,110 @@
+# The card engine in Rust. The JavaScript workspace is pnpm's.
+[workspace]
+resolver = "2"
+members = ["crates/card3d-engine", "crates/card3d-native", "crates/card3d-web", "crates/card3d-tools", "crates/card3d-ffi"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+wgpu = { version = "30", default-features = false, features = ["wgsl", "std"] }
+bytemuck = { version = "1", features = ["derive"] }
+glam = "0.34"
+serde_json = "1"
+card3d-engine = { path = "crates/card3d-engine" }
+card3d-native = { path = "crates/card3d-native" }
+
+# Lints for every crate (`[lints] workspace = true`). CI and scripts/check-rust.sh run clippy with
+# `-D warnings`, so each of these fails the check. A crate or item that needs an exception says so
+# with `#[allow(lint, reason = "…")]` where it applies. Beyond rustc's and clippy's defaults, the
+# lints below each catch a real problem without asking to rewrite the ported maths; groups left out
+# and why: clippy::pedantic and ::nursery as a whole (thousands of casts, float comparisons, long
+# literals and `mul_add` rewrites in code pinned to the TypeScript's numbers: picked one by one
+# below), clippy::restriction (a menu, not a group), unwrap_used / expect_used (the engine's
+# unwraps are invariants of its own state; expect messages would grow the web build's main module),
+# missing_debug_implementations (~80 GPU-holding types), unsafe_op_in_unsafe_fn (card3d-ffi's
+# `unsafe extern "C"` bodies; comes with the 2024 edition).
+[workspace.lints.rust]
+# `'_` in paths, no `extern crate`.
+rust_2018_idioms = { level = "warn", priority = -1 }
+# `unsafe` only at the boundaries that need it (card3d-ffi's C ABI and JNI; the web's number parser),
+# each under an `#[allow]` that names it.
+unsafe_code = "deny"
+missing_unsafe_on_extern = "warn"
+# Knip's unused exports: `pub` only on what another crate can reach; `pub(crate)` for the rest.
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+unused_lifetimes = "warn"
+redundant_lifetimes = "warn"
+unused_macro_rules = "warn"
+trivial_numeric_casts = "warn"
+unit_bindings = "warn"
+
+[workspace.lints.clippy]
+# The default groups (correctness, suspicious, style, complexity, perf) stay on as warnings, except:
+# the ports keep their originals' positional signatures (render passes, geometry builders), so
+# argument counts aren't a smell here.
+too_many_arguments = "allow"
+# Leftovers: debugging output and stubs.
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+# Output belongs to the hosts (the web build has no logger; card3d-tools' binaries print on purpose).
+print_stdout = "warn"
+print_stderr = "warn"
+exit = "warn"
+# Every exception says why.
+allow_attributes_without_reason = "warn"
+# unsafe: every block says why it is sound, one unsafe operation per block, no stale SAFETY notes.
+undocumented_unsafe_blocks = "warn"
+multiple_unsafe_ops_per_block = "warn"
+unnecessary_safety_comment = "warn"
+unnecessary_safety_doc = "warn"
+# Pointer casts that can change the pointee's type, constness or alignment unnoticed (the C ABI).
+ptr_as_ptr = "warn"
+ptr_cast_constness = "warn"
+ref_as_ptr = "warn"
+as_ptr_cast_mut = "warn"
+cast_ptr_alignment = "warn"
+fn_to_numeric_cast_any = "warn"
+# Numbers: a float literal that isn't the value it reads as (the parity pins), bit-operator precedence.
+lossy_float_literal = "warn"
+precedence_bits = "warn"
+# Bug patterns (pedantic, nursery and restriction lints with no false positives in this code).
+debug_assert_with_mut_call = "warn"
+infinite_loop = "warn"
+mem_forget = "warn"
+mixed_read_write_in_expression = "warn"
+non_send_fields_in_send_ty = "warn"
+path_buf_push_overwrite = "warn"
+significant_drop_in_scrutinee = "warn"
+suspicious_xor_used_as_pow = "warn"
+iter_over_hash_type = "warn"
+collection_is_never_read = "warn"
+# Needless copies and allocations.
+cloned_instead_of_copied = "warn"
+implicit_clone = "warn"
+inefficient_to_string = "warn"
+needless_collect = "warn"
+redundant_clone = "warn"
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+# The web builds: smallest code, no unwinding.
+[profile.web]
+inherits = "release"
+opt-level = "z"
+panic = "abort"
+
+# The native libraries for apps (apple/build-xcframework.sh): release (fat LTO, one codegen unit),
+# no debug info. Panics unwind, so the C ABI catches an engine panic and reports it instead of
+# taking the app down (crates/card3d-ffi); the script strips the library's debug symbols.
+[profile.native]
+inherits = "release"
+debug = false
+strip = "debuginfo"

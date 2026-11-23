@@ -1,0 +1,1 @@
+{"recipe": {"material": "silver", "texture": "brushed", "color": "#8d949c"}, "cardholderName": "Ada Lovelace", "shaders": [{"id": "halftone", "side": "both", "target": "overlay", "blend": "multiply", "params": {"source": 1}}], "scene": {"floor": {"reflectivity": 0.8, "blur": 0.1}}}

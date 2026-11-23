@@ -1,0 +1,113 @@
+# Version: opens and updates the "chore: version packages" PR from pending changesets (.changeset/*.md).
+# It never publishes: release.yml does that once CI passes on the commit that merges the PR.
+#
+# Versioning and publishing are separate workflows on purpose (as in the sibling wave3d project): GitHub
+# keeps only the NEWEST pending run per concurrency group and cancels the one before it, so when both
+# shared one group a feature push could cancel a pending publish, then (carrying new changesets) version
+# instead of publishing. Here a pending versioning run can only be replaced by a newer versioning run,
+# which versions everything the older one would have; scripts/version-pr-guard.sh skips a run whose
+# checkout main has since moved past.
+#
+# `pnpm run version` is `changeset version` (the fixed @card3d group's bump, CHANGELOGs with PR links
+# through @changesets/changelog-github) and scripts/skill-versions.mjs (the shipped skills'
+# metadata.library_version, set and recorded as reviewed when no skill review is pending), so the skills'
+# version rides the same PR.
+#
+# The PR is opened with GITHUB_TOKEN, which starts no workflows: CI and Check Skills don't run on it by
+# themselves (DEPLOY.md: close and reopen it to run them). The Intent check at the end of this job checks
+# the versioned tree in the meantime.
+name: Version
+
+on:
+  push:
+    branches: [main]
+    # What versioning reads. scripts/version-pr-guard.sh relies on packages/ and .changeset/ being here:
+    # when main moves under them, the push's own run is guaranteed to be queued.
+    paths:
+      - "packages/**"
+      - ".changeset/**"
+      - ".github/workflows/version.yml"
+      - "scripts/skill-versions.mjs"
+      - "scripts/version-pr-guard.sh"
+  workflow_dispatch: {}
+
+permissions: {}
+
+# One at a time, so two runs never force-push the version branch over each other. No
+# cancel-in-progress: an older run that starts late is caught by the guard's precheck instead.
+concurrency:
+  group: version
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "26"
+
+jobs:
+  version:
+    name: Version Packages PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write # the changeset-release/main branch
+      pull-requests: write # the Version Packages PR
+    # No test gates here: this only proposes a PR, and the publish that merging it leads to runs after
+    # CI passes on the merge commit.
+    steps:
+      # Taken before anything else, so that "newer than this" in the guard's ensure step means "made by
+      # this run": the previous run's branch push and PR update are older.
+      - id: started
+        run: echo "at=$(date -u +%s)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # changeset version finds each changeset's commit (CHANGELOG links); the Intent review needs its
+          # recorded baseline commit.
+          fetch-depth: 0
+      # The pnpm version comes from package.json's packageManager field.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      # Versioning needs @changesets/cli and @tanstack/intent, no build: no lifecycle scripts.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      # skip=true when there is nothing to version (no changesets in this checkout), or when main has
+      # since changed under packages/ or .changeset/: this checkout is stale, and the run for that push is
+      # queued behind this one.
+      - name: Check main has not moved on
+        id: fresh
+        run: bash scripts/version-pr-guard.sh precheck
+      - name: Version Packages PR
+        id: changesets
+        if: steps.fresh.outputs.skip != 'true'
+        # Soft-fail on purpose: the action reports PR-API problems as a bare `HttpError`. The guard step
+        # below decides the real outcome and prints the actual API error.
+        continue-on-error: true
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          version-script: pnpm run version
+          # Never runs (this step only runs with changesets present, which is version mode); set so the
+          # PR body says the packages will be published automatically, which release.yml makes true.
+          publish-script: "false"
+          commit-message: "chore: version packages"
+          pr-title: "chore: version packages"
+        # No GITHUB_TOKEN env: v2 reads its github-token input (this workflow's token by default) and
+        # passes it to the version script, where @changesets/changelog-github uses it.
+
+      # Decide the run's real outcome, and self-heal what the action cannot report on (a branch pushed
+      # but no PR opened; an open Version PR that bumps nothing main lacks is closed).
+      - name: Ensure Version Packages PR
+        if: steps.fresh.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUTCOME: ${{ steps.changesets.outcome }}
+          STARTED: ${{ steps.started.outputs.at }}
+        run: bash scripts/version-pr-guard.sh ensure
+
+      # The checkout now holds the versioned tree the PR carries. Check Skills doesn't run on a PR
+      # opened with GITHUB_TOKEN, so run its gate here: valid skills, synced metadata, and no pending
+      # skill review (scripts/skill-versions.mjs recorded its library_version edit).
+      - name: Intent check of the versioned tree
+        if: steps.changesets.outcome == 'success'
+        run: |
+          pnpm exec intent validate
+          pnpm exec intent maintainer check --artifacts _artifacts --github-summary

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" data-backdrop="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Card Studio — design 3D metal cards in the browser</title>
+    <meta
+      name="description"
+      content="Design 3D metal cards in your browser: metals, textures, holo foil, artwork, stickers and drawings. Export images, turntable videos, glTF and code."
+    />
+    <meta name="theme-color" content="#09090e" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <noscript>
+      <p style="max-width: 60ch; margin: 12vh auto; padding: 0 24px; color: #ddd; font: 15px/1.5 system-ui, sans-serif">
+        Card Studio designs 3D metal cards with WebGL. It needs JavaScript.
+      </p>
+    </noscript>
+    <main id="workspace" aria-label="Card preview">
+      <div id="stage">
+        <canvas id="card-canvas"></canvas>
+      </div>
+      <div id="stage-tools" aria-label="View">
+        <span id="res-badge" class="c3-tool c3-res" role="status" hidden></span>
+        <button id="side-toggle" class="c3-tool" type="button" data-side="front" title="Flip the card (click the card, or Enter)">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>
+          <span class="c3-side-label">Front</span>
+        </button>
+        <button id="reset-view" class="c3-tool" type="button" title="Reset the view (double-click the card, or Esc)" aria-label="Reset view">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+      </div>
+      <p id="status" role="status"><span class="c3-spinner" aria-hidden="true"></span><span class="c3-status-text">Building…</span></p>
+      <p id="hint">Drag to turn · click to flip · double-click to reset · drag stickers to move them, double-click one to crop</p>
+    </main>
+    <aside id="panel" aria-label="Card controls"></aside>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

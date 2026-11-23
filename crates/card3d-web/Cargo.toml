@@ -1,0 +1,44 @@
+[package]
+name = "card3d-web"
+description = "wasm-bindgen bindings of the card engine: WebGPU, or WebGL 2 with --features webgl."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+default = ["webgpu"]
+webgpu = ["wgpu/webgpu"]
+webgl = ["wgpu/webgl"]
+
+# The crate is empty off wasm (src/lib.rs), so its dependencies are wasm-only.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+card3d-engine.workspace = true
+wgpu.workspace = true
+wasm-bindgen = "=0.2.130"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+console_error_panic_hook = "0.1"
+# No logger is installed on the web, so wgpu's and naga's log calls (and the Debug formatting they
+# pull in) are compiled out.
+log = { version = "0.4", features = ["max_level_off", "release_max_level_off"] }
+web-sys = { version = "0.3", features = [
+    "HtmlCanvasElement",
+    "OffscreenCanvas",
+    "OffscreenCanvasRenderingContext2d",
+    "TextMetrics",
+    "ImageData",
+    "CanvasGradient",
+    "Path2d",
+    "CanvasWindingRule",
+] }
+
+[lints]
+workspace = true
+
+[package.metadata.cargo-shear]
+# Never called: there for its features, which compile wgpu's and naga's logging out.
+ignored = ["log"]

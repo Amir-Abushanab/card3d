@@ -1,0 +1,173 @@
+library:
+  name: card3d-workspace
+  version: 0.1.0
+generated_from:
+  domain_map: _artifacts/domain_map.yaml
+  skill_spec: _artifacts/skill_spec.md
+# Paths whose changes can't alter what the @card3d npm packages ship or what their skills claim, so
+# `intent maintainer check` doesn't ask for a review record on them (skill_spec.md, Decisions). Still
+# reported: packages/**, the engine compiled into @card3d/core (crates/card3d-engine, crates/card3d-web)
+# and README.md. A skill that lists an ignored path in `sources` still tracks it.
+review:
+  ignore:
+    - ".changeset/**"
+    - "**/CHANGELOG.md"
+    - ".github/**"
+    - ".claude/**"
+    - ".cargo/**"
+    - "apps/**"
+    - "android/**"
+    - "apple/**"
+    - "crates/card3d-ffi/**"
+    - "crates/card3d-native/**"
+    - "crates/card3d-tools/**"
+    - "**/Cargo.toml"
+    - "Cargo.lock"
+    - "deny.toml"
+    - "rustfmt.toml"
+    - "scripts/**"
+    - "DEPLOY.md"
+    - "LICENSE"
+    - "THIRD_PARTY_NOTICES.md"
+    - "tsconfig.json"
+    - "pnpm-workspace.yaml"
+skills:
+  [
+    {
+        name: card-design-json,
+        slug: card-design-json,
+        domain: design-model,
+        package: packages/core,
+        path: skills/card-design-json/SKILL.md,
+        description: "Use when writing, editing, validating or explaining a Card Studio
+          card design (the CardDesign JSON that @card3d/core, <metal-card> and
+          <MetalCard> draw): picking a preset or recipe (material, colour,
+          texture, grain, polish, relief, spectrum), holo foil, built-in face
+          shader layers, add-ons, the card body (shape, edge, finish,
+          contactless, text lines, logo), lighting and scene staging; checking a
+          design with ensureDesign or lintDesign; reading or making Card Studio
+          share links. For writing custom WGSL face shaders use
+          custom-face-shaders-wgsl; for showing a card on a page use
+          embed-metal-card.",
+        sources:
+          [
+            src/types.ts,
+            src/design/**,
+            src/describe/**,
+            src/presets.ts,
+            src/recipe/defaults.ts
+          ],
+        requires: [],
+        references:
+          [
+            references/design-fields.md,
+            references/examples.md,
+            references/presets.md,
+            references/shaders-and-effects.md
+          ],
+        purpose: "The design model every card3d host draws: what a CardDesign holds, how
+          to write one that renders as intended, and how to validate untrusted
+          designs and share links."
+      },
+    {
+        name: custom-face-shaders-wgsl,
+        slug: custom-face-shaders-wgsl,
+        domain: face-shaders,
+        package: packages/core,
+        path: skills/custom-face-shaders-wgsl/SKILL.md,
+        description: 'Use when writing, porting or debugging a custom WGSL face shader
+          layer on a Card Studio card (@card3d/core): a FaceShader with id
+          "custom" and language "wgsl", the prelude it runs in (mainImage,
+          uTime, uTilt, facePos, viewDir, chipDistance, artwork), // @param and
+          // @color annotations that become params, skin vs overlay targets and
+          blends, and annotation or compile errors from lintDesign,
+          EngineStage.checkShader or shaderErrors. Also when converting a GLSL
+          or Shadertoy shader for the card. For the built-in shader library and
+          the rest of the design use card-design-json.',
+        sources:
+          [
+            src/shaders/**,
+            src/design/sanitize.ts,
+            Amir-Abushanab/card3d:crates/card3d-engine/shaders/face/prelude.wgsl,
+            Amir-Abushanab/card3d:crates/card3d-engine/src/face_custom.rs
+          ],
+        requires: [ card-design-json ],
+        references: [ references/prelude.md ],
+        purpose: "Write custom WGSL face shader layers that compile on the card engine
+          (WebGPU and its WebGL 2 build), expose editable parameters, and stay
+          cheap enough for phones."
+      },
+    {
+        name: engine-stage,
+        slug: engine-stage,
+        domain: engine,
+        package: packages/core,
+        path: skills/engine-stage/SKILL.md,
+        description: "Use when building your own page, editor or export pipeline on the
+          @card3d/core card engine instead of the drop-in element:
+          createEngineStage on a canvas (options, setDesign, flip, pause, fit,
+          quality, backend fallback, context loss, dispose),
+          createOffscreenStage for PNG frames, thumbnails and video along camera
+          paths, AR export (USDZ / GLB) and AR viewers, print production files
+          (bakePrint from @card3d/core/print), the marquee carousel, asset
+          providers, and bundling or serving the engine wasm and font files. For
+          a card on a page without custom code use embed-metal-card.",
+        sources:
+          [
+            src/engine.ts,
+            src/index.ts,
+            src/standalone.ts,
+            src/scene/camera-paths.ts,
+            src/print.ts,
+            src/marquee/**,
+            src/ar/**,
+            README.md
+          ],
+        requires: [ card-design-json ],
+        references: [ references/exports.md, references/stage-api.md ],
+        purpose: "Drive the Rust + wgpu card engine directly from TypeScript: live
+          stages, deterministic offscreen frames, AR and print exports, and the
+          files a bundler or server must deliver."
+      },
+    {
+        name: embed-metal-card,
+        slug: embed-metal-card,
+        domain: embedding,
+        package: packages/element,
+        path: skills/embed-metal-card/SKILL.md,
+        description: "Use when putting a 3D metal card on a web page with the
+          <metal-card> custom element from @card3d/element, by CDN script tag or
+          npm, in plain HTML, Vue, Svelte, Angular, Astro or another non-React
+          stack: choosing the design source (design JSON, Card Studio share
+          link, src URL, preset) and attribute overrides, sizing and fit,
+          interaction and auto-rotate, View in AR, scene environment and floor,
+          the metal-card-ready / metal-card-error events, many cards on one page
+          and the GPU context limit, self-hosting the bundle, serving wasm and
+          Content-Security-Policy. For React use metal-card-react; for the
+          design JSON itself use card-design-json.",
+        sources: [ src/**, README.md, vite.standalone.config.ts ],
+        requires: [],
+        references: [ references/attributes.md, references/serving-and-csp.md ],
+        purpose: "Embed Card Studio designs as live 3D cards on any page with the
+          <metal-card> element, served from a CDN, a bundler or your own host."
+      },
+    {
+        name: metal-card-react,
+        slug: metal-card-react,
+        domain: embedding,
+        package: packages/react,
+        path: skills/metal-card-react/SKILL.md,
+        description: 'Use when rendering a 3D metal card in a React, Next.js or Remix
+          app with <MetalCard> from @card3d/react: its props (design object or
+          JSON, share, src, preset, overrides, interaction, autoRotate, fit,
+          quality, lazy, paused), onReady and onError, the ref to the underlying
+          <metal-card> element (flip, reset, stage, viewInAr), server rendering
+          and "use client", and the element attributes the component does not
+          expose (ar, environment, floor). For the element behaviour see
+          embed-metal-card; for the design JSON see card-design-json.',
+        sources: [ src/index.tsx, README.md ],
+        requires: [ "@card3d/element#embed-metal-card" ],
+        purpose: "Use the <metal-card> element from React through the thin <MetalCard>
+          wrapper, including SSR and imperative control."
+      }
+  ]

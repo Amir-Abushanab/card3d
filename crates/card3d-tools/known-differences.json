@@ -1,0 +1,16 @@
+{
+  "_doc": "Renders that may fail the comparison for an explained reason: { build: { design: reason } }. compare reports them as KNOWN instead of FAIL. Every entry needs a reason. An entry may instead be { \"reason\", \"maxMae\", \"maxOver24\" }: KNOWN only within those limits (mean error, % of card pixels off by more than 24), FAIL past them.",
+  "webgpu": {
+    "holo-styles": "Holo sparkle / cosmos cells come from fract(sin(x) · 43758.5453), whose result depends on the GPU's sin precision (holo-shader.ts: 'cell placement is driver-dependent; only the statistics are meant to match'). Chrome's WebGPU evaluates sin differently from WebGL, so the cells land elsewhere.",
+    "preset-cosmos-sparkle": "As holo-styles: driver-dependent sparkle / star cell placement.",
+    "preset-shiny-lime-tile": "As holo-styles: driver-dependent sparkle cell placement."
+  },
+  "rust": {
+    "addon-shine-vines": {
+      "reason": "Shine's glow brightens the chip and text silhouettes, which already differ by a pixel between the engines, and here the vines' too: at the edge pose, natively at contain fit, it sits at the 0.75 bar (WebGPU 0.68). Limits catch a real regression.",
+      "maxMae": 1.0,
+      "maxOver24": 1.5
+    }
+  },
+  "webgl": {}
+}

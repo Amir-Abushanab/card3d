@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>card3d showcase</title>
+    <meta name="description" content="A drifting arc of 3D metal cards, rendered with card3d." />
+    <meta name="theme-color" content="#050507" />
+    <link rel="stylesheet" href="/src/showcase/showcase.css" />
+  </head>
+  <body>
+    <div class="sc-root" data-intro-ui="waiting">
+      <nav class="sc-nav" aria-label="Primary">
+        <a class="sc-nav__brand" href="./showcase.html">
+          <svg class="sc-nav__mark" viewBox="0 0 42 48" aria-hidden="true"><path d="M19.28 2.13L37.07 12.4L19.28 22.67L1.5 12.4ZM0 15L17.78 25.27L17.78 45.8L0 35.53ZM20.78 25.27L38.57 15L38.57 35.53L20.78 45.8Z" /></svg>
+          card3d
+        </a>
+        <div class="sc-nav__links">
+          <a href="#work">Cards</a>
+          <a href="https://github.com/Amir-Abushanab/card3d" target="_blank" rel="noopener">Source</a>
+          <a class="sc-nav__cta" href="./index.html">Open the studio</a>
+        </div>
+      </nav>
+
+      <section class="sc-hero" aria-label="Card marquee">
+        <div class="card-marquee" data-bg="white">
+          <div class="card-marquee__bg"></div>
+          <div class="card-marquee__stage" id="marquee"></div>
+          <div class="card-marquee__headline">
+            <h1 class="card-marquee__title" aria-label="card3d"><span class="card-marquee__wordmark" id="wordmark" aria-hidden="true"></span></h1>
+            <p class="card-marquee__tagline">3D metal cards, designed in your browser. Metals, foils, effects and shaders, live.</p>
+          </div>
+          <div class="sc-lighting" role="radiogroup" aria-label="Lighting" id="lighting"></div>
+        </div>
+      </section>
+
+      <div class="sc-scrub" aria-hidden="true"></div>
+
+      <main class="sc-stage" id="work">
+        <div class="sc-grid">
+          <div class="sc-cell sc-cell--lead" data-sc-target aria-label="The card marquee"></div>
+          <article class="sc-cell">
+            <h2>One canvas</h2>
+            <p>Seven card slots recycle along an endless strip, one card per studio preset. Every card is live 3D: metal, foil, effects and shader layers.</p>
+          </article>
+          <article class="sc-cell">
+            <h2>Drift, drag, fling</h2>
+            <p>Drag or scroll sideways to scrub the strip, let go to fling it. Click a card to bring it to the centre and turn it over.</p>
+          </article>
+          <article class="sc-cell">
+            <h2>Seeded order</h2>
+            <p>Add <code>?seed=42</code> for a reproducible shuffle, <code>?card=gold-shine</code> (any preset id) to pin one design to the centre, or <code>?lighting=warm</code> to pick the light.</p>
+          </article>
+          <article class="sc-cell">
+            <h2>Light it</h2>
+            <p>Six lighting presets (studio, dramatic, warm, cool, dark and light) retune the softboxes, the key light and the backdrop. The studio saves the choice with each design and exports it.</p>
+          </article>
+          <article class="sc-cell">
+            <h2>Your mark, your type</h2>
+            <p>Upload an SVG or PNG logo to replace the corner mark (or place it elsewhere on the face), and set the name in one of six open-licence fonts that ship with the engine.</p>
+          </article>
+          <article class="sc-cell">
+            <h2>Make your own</h2>
+            <p>Open the <a href="./index.html">studio</a> to design a card from scratch, then export an image, a turntable video or GIF, a glTF model or code.</p>
+          </article>
+        </div>
+        <footer class="sc-footer">card3d · <a href="https://github.com/Amir-Abushanab/card3d" target="_blank" rel="noopener">source on GitHub</a> · fonts under the SIL Open Font License</footer>
+      </main>
+    </div>
+    <script type="module" src="/src/showcase/main.ts"></script>
+  </body>
+</html>

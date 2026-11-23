@@ -1,0 +1,105 @@
+{
+  "name": "@card3d/core",
+  "version": "0.0.0",
+  "description": "3D metal cards on a Rust engine (WebGPU, with a WebGL 2 fallback) and the design model behind Card Studio",
+  "keywords": [
+    "3d",
+    "card",
+    "credit-card",
+    "metal",
+    "shader",
+    "wasm",
+    "webgl",
+    "webgpu",
+    "tanstack-intent"
+  ],
+  "homepage": "https://github.com/Amir-Abushanab/card3d/tree/main/packages/core#readme",
+  "bugs": "https://github.com/Amir-Abushanab/card3d/issues",
+  "license": "MIT",
+  "author": "Amir Abushanab (https://github.com/Amir-Abushanab)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Amir-Abushanab/card3d.git",
+    "directory": "packages/core"
+  },
+  "files": [
+    "dist",
+    "assets/fonts",
+    "assets/environments",
+    "wasm",
+    "THIRD_PARTY_NOTICES.md",
+    "skills/card-design-json",
+    "skills/custom-face-shaders-wgsl",
+    "skills/engine-stage"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./standalone": "./src/standalone.ts",
+    "./engine": "./src/engine.ts",
+    "./model": "./src/model.ts",
+    "./editor": "./src/editor.ts",
+    "./describe": "./src/describe.ts",
+    "./print": "./src/print.ts",
+    "./marquee": "./src/marquee.ts",
+    "./reference": "./src/reference.ts",
+    "./assets/fonts/*": "./assets/fonts/*",
+    "./assets/environments/*": "./assets/environments/*",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./standalone": {
+        "types": "./dist/standalone.d.ts",
+        "default": "./dist/standalone/card3d.standalone.js"
+      },
+      "./engine": {
+        "types": "./dist/engine.d.ts",
+        "default": "./dist/engine.js"
+      },
+      "./model": {
+        "types": "./dist/model.d.ts",
+        "default": "./dist/model.js"
+      },
+      "./editor": {
+        "types": "./dist/editor.d.ts",
+        "default": "./dist/editor.js"
+      },
+      "./describe": {
+        "types": "./dist/describe.d.ts",
+        "default": "./dist/describe.js"
+      },
+      "./print": {
+        "types": "./dist/print.d.ts",
+        "default": "./dist/print.js"
+      },
+      "./marquee": {
+        "types": "./dist/marquee.d.ts",
+        "default": "./dist/marquee.js"
+      },
+      "./assets/fonts/*": "./assets/fonts/*",
+      "./assets/environments/*": "./assets/environments/*",
+      "./package.json": "./package.json"
+    },
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown && pnpm build:standalone",
+    "build:standalone": "vite build --config vite.standalone.config.ts",
+    "prepack": "node ../../scripts/package-notices.mjs --notices",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@tanstack/intent": "0.5.6",
+    "@types/node": "^26.6.6",
+    "tsdown": "^0.23.7",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

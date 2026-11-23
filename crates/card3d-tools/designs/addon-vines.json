@@ -1,0 +1,5 @@
+{
+  "recipe": { "material": "silver", "texture": "brushed", "color": "#d9d6cc", "polish": 58 },
+  "cardholderName": "Ada Lovelace",
+  "addons": { "vines": { "time": 31 } }
+}

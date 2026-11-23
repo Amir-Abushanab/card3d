@@ -1,0 +1,20 @@
+[package]
+name = "card3d-tools"
+description = "Native tools for the card engine: headless renders, comparisons, the window viewer."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+card3d-engine.workspace = true
+card3d-native.workspace = true
+wgpu = { workspace = true, features = ["metal", "vulkan", "dx12", "gles"] }
+bytemuck.workspace = true
+serde_json.workspace = true
+pollster = "1"
+png = "0.18"
+winit = "0.30"
+
+[lints]
+workspace = true

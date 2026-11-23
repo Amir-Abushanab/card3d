@@ -1,0 +1,6 @@
+{
+  "recipe": { "material": "nickel", "texture": "none", "grain": 0, "relief": 0, "polish": 92, "color": "#2a2d2b" },
+  "materialOverride": { "roughness": 0.12, "clearcoat": 0.2 },
+  "brandingOverride": { "color": "#e8c27a", "roughness": 0.2, "brandingClearcoat": 0.6 },
+  "cardholderName": "Grace Hopper"
+}

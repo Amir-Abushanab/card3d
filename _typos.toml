@@ -1,0 +1,61 @@
+# typos (https://github.com/crate-ci/typos): the spelling check for the whole repository, Rust and
+# TypeScript alike (scripts/check-rust.sh runs `typos`; CI's rust job too). It only reads files git
+# doesn't ignore, so .archive/, .reference/, docs/, target/ and node_modules/ are out already.
+# A word it flags that is right: add it below with what it is, or fix the spelling.
+
+[files]
+extend-exclude = [
+    # Lockfiles: package names and hashes.
+    "Cargo.lock",
+    "pnpm-lock.yaml",
+    # Other projects' licence texts, verbatim.
+    "THIRD_PARTY_NOTICES.md",
+    "**/LICENSE",
+    # Generated: from packages/core/src (scripts/skill-references.mjs), the C header (cbindgen), the
+    # validator's catalog (crates/card3d-tools/validate-catalog.ts).
+    "packages/*/skills/*/references/",
+    "crates/card3d-ffi/include/card3d.h",
+    "crates/card3d-engine/src/validate/catalog.json",
+    # Binary and encoded fixtures.
+    "*.svg",
+    "*.hdr",
+    "*.webp",
+    "*.glb",
+    "*.usdz",
+    "*.f16",
+]
+
+[default]
+extend-ignore-re = [
+    # Base64 payloads (data: URLs, inline fixtures).
+    "data:[a-z]+/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+",
+    # `// typos: ignore-line` (or `# typos: ignore-line`) skips the rest of a line.
+    "(?Rm)^.*(#|//)\\s*typos:\\s*ignore-line$",
+    # FNV-1a hashes (the validator's committed sample stores designs by hash).
+    "\"design\":\"[0-9a-f]{16}\"",
+]
+
+[default.extend-words]
+# Graphics terms (three.js, glTF, the PBR literature).
+metalness = "metalness"
+lod = "lod" # level of detail
+# Short names in shaders and maths (normals, bases, thresholds, …).
+nd = "nd"
+pn = "pn"
+iy = "iy"
+ba = "ba"
+thr = "thr"
+halfs = "halfs" # IEEE half floats
+numer = "numer" # image::Delay::numer_denom_ms
+loca = "loca" # the TrueType `loca` table
+# PDF's FlateDecode filter.
+flate = "flate"
+# Spellings that are fine.
+unparseable = "unparseable"
+alikes = "alikes" # look-alikes
+# Test inputs: truncated or invalid on purpose (JSON literals, base64 input, initials, build ids).
+tru = "tru"
+infinit = "infinit"
+fo = "fo"
+abl = "abl"
+abd = "abd"

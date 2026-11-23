@@ -1,0 +1,9 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+# build output of build.sh (the engine's shared libraries)
+card3d/src/main/jniLibs/
+*.so
+*.aar
+*.apk

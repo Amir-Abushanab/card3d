@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- CardView's TalkBack action that resets the card. -->
+  <item name="card3d_action_reset" type="id" />
+</resources>

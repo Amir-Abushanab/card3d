@@ -1,0 +1,35 @@
+[package]
+name = "card3d-ffi"
+description = "The card engine behind a small C ABI (include/card3d.h) for native apps: the Swift package (apple/) and the Android library."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+# `libcard3d`. Only an rlib here, so workspace builds and tests don't link a large static library:
+# apple/build-xcframework.sh builds the static library with `cargo rustc --crate-type staticlib`
+# (android/build.sh builds the shared library for Android with `--crate-type cdylib` the same way).
+name = "card3d"
+crate-type = ["rlib"]
+
+[dependencies]
+card3d-engine.workspace = true
+card3d-native.workspace = true
+pollster = "1"
+# PNG encoding for `card3d_stage_export_png` (already in the native host's tree).
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+# Metal on Apple platforms; Vulkan and GLES elsewhere (Android, Linux CI).
+[target.'cfg(target_vendor = "apple")'.dependencies]
+wgpu = { workspace = true, features = ["metal"] }
+
+[target.'cfg(not(target_vendor = "apple"))'.dependencies]
+wgpu = { workspace = true, features = ["vulkan", "gles"] }
+
+# The Kotlin library's native methods (src/android.rs).
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.22"
+
+[lints]
+workspace = true

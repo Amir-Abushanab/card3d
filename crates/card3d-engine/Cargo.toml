@@ -1,0 +1,31 @@
+[package]
+name = "card3d-engine"
+description = "The card renderer: geometry, materials, lighting and layers on wgpu. No platform code."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# The design validator (`validate`): `ensureDesign` and `lintDesign` in Rust, for native hosts. The web
+# builds validate in TypeScript and leave it out.
+validate = ["dep:url", "dep:icu_properties"]
+
+[dependencies]
+wgpu.workspace = true
+bytemuck.workspace = true
+glam.workspace = true
+wasm_split_helpers = "0.2.3"
+# fdlibm maths (as V8's) for the vine model, whose leaf count depends on the last bit.
+libm = "0.2"
+# WHATWG URL parsing (font URLs, as `new URL`) and Unicode general categories (`\p{L}`, `\p{N}`), for
+# `validate` only.
+url = { version = "2.5", optional = true }
+icu_properties = { version = "2", optional = true }
+
+[dev-dependencies]
+# The oracle for the JSON reader's tests.
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>metal-card classic script example</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f2f1ec; }
+      metal-card { width: min(520px, 92vw); }
+    </style>
+    <!-- The classic-script build: no type="module" needed; defer keeps it off the critical path. -->
+    <script src="/npm/@card3d/element/dist/standalone/metal-card.iife.js" defer></script>
+  </head>
+  <body>
+    <metal-card id="card" preset="champagne-silver" name="Hedy Lamarr" bio="Member since 1942" lighting="light" font="manrope"></metal-card>
+  </body>
+</html>

@@ -1,0 +1,112 @@
+# The native hosts: the Swift package (apple/) and the Android library
+# (android/). Slow (fat-LTO native builds, a macOS runner), so on pushes to main that touch the engine or
+# the hosts, and by hand (Actions → Native → Run workflow). No signing and no secrets: the iOS example
+# builds for the simulator with signing off, and the Android outputs are unsigned release / debug builds.
+name: Native
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/**"
+      - "apple/**"
+      - "android/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".cargo/**"
+      - "packages/core/assets/environments/**"
+      - ".github/workflows/native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # As ci.yml.
+  RUST_TOOLCHAIN: "1.100.0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # The XCFramework's macOS and iOS-simulator slices, the Swift tests (six designs drawn through the C ABI
+  # on Metal, compared with the engine's native renders: apple/test.sh) and the example app for the iOS
+  # simulator. The iOS device slice isn't built here (same code as the simulator's, another LTO build).
+  apple:
+    name: Apple (XCFramework, swift test, iOS example)
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master (2026-11-15)
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: aarch64-apple-darwin, aarch64-apple-ios-sim
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      # build-xcframework.sh regenerates crates/card3d-ffi/include/card3d.h with cbindgen when it's installed.
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+        with:
+          tool: cbindgen@0.29.4
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+          rustc --version
+      - name: Build the XCFramework (macOS + iOS simulator)
+        run: CARD3D_TARGETS="aarch64-apple-darwin aarch64-apple-ios-sim" apple/build-xcframework.sh
+      - name: The C header matches crates/card3d-ffi/src (cbindgen)
+        run: git diff --exit-code -- crates/card3d-ffi/include/card3d.h
+      # Builds the harness's native renders of the six test designs (Metal), then `swift test`.
+      - run: apple/test.sh
+      - name: Build the example app for the iOS simulator (unsigned)
+        run: |
+          xcodebuild build \
+            -project apple/Example/Card3DExample.xcodeproj \
+            -scheme Card3DExample \
+            -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath "$RUNNER_TEMP/example" \
+            ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO
+
+  # libcard3d.so for arm64-v8a with the runner's NDK (ANDROID_NDK_HOME), the AAR, the example APK and the
+  # instrumented tests' APK. The instrumented tests themselves (android/test.sh) need a device or an
+  # emulator with Vulkan and aren't run here.
+  android:
+    name: Android (libcard3d.so, AAR, example)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master (2026-11-15)
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      # The wrapper's Gradle distribution, the dependency and configuration caches.
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Toolchain
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          java -version
+          rustc --version
+      # The .so (NDK clang for API 26), then Gradle: :card3d:assembleRelease and :example:assembleDebug.
+      - run: android/build.sh
+      - name: Build the instrumented tests' APK
+        working-directory: android
+        run: ./gradlew --quiet :card3d:assembleDebugAndroidTest
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android
+          path: |
+            android/card3d/build/outputs/aar/card3d-release.aar
+            android/example/build/outputs/apk/debug/example-debug.apk
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,77 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Lints every JS/TS file in the workspace (packages, apps, scripts, crates/card3d-tools, the web crate's
+  // test page). Not type-aware: oxlint's type-aware mode (oxlint-tsgolint) isn't marked stable yet.
+  "plugins": ["eslint", "typescript", "unicorn", "import", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "env": { "browser": true, "node": true, "es2024": true },
+  "rules": {
+    // ── a few pedantic rules that catch real mistakes or keep things plain ──
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "unicorn/no-lonely-if": "error",
+    "unicorn/no-useless-switch-case": "error",
+    "unicorn/no-negation-in-equality-check": "error",
+    "unicorn/escape-case": "error",
+    "unicorn/prefer-import-meta-properties": "error",
+    "unicorn/prefer-node-protocol": "error",
+    "import/no-duplicates": "error",
+    "import/no-self-import": "error",
+
+    // ── suspicious / perf rules switched off, with the reason ──
+    // Build-time defines (__CARD3D_LOCAL_PACK__, __CARD3D_LOCAL_PLUGIN__, __CARD3D_ELEMENT_VERSION__),
+    // wasm-bindgen's names and `_`-prefixed private fields are the project's conventions.
+    "no-underscore-dangle": "off",
+    // Small helpers stay next to their only caller even when they capture nothing.
+    "unicorn/consistent-function-scoping": "off",
+    // The e2e tests' page.evaluate callbacks run in the browser and re-declare names on purpose; short
+    // loop/lambda names (a, b, r, e, f) are reused in nested scopes throughout.
+    "no-shadow": "off",
+    // toSorted / toReversed are ES2023; the packages target ES2022 (tsconfig lib), and the sorts here are
+    // on arrays the function just built.
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+    // False positives on Canvas 2D's ctx.fill(path) / Path2D, which isn't Array#fill.
+    "unicorn/no-array-fill-with-reference-type": "off",
+    // One-shot handlers on IDBRequest / FileReader / Image / MediaRecorder, set once where they're made.
+    "unicorn/prefer-add-event-listener": "off",
+    // The Anthropic SDK documents its error classes as static members (Anthropic.RateLimitError).
+    "import/no-named-as-default-member": "off",
+    // Sequential awaits in loops are deliberate (e2e steps, file writes in order, GPU work one at a time).
+    "no-await-in-loop": "off",
+    // Spreading in map callbacks is how designs are copied immutably; the arrays are small.
+    "oxc/no-map-spread": "off",
+    // Side-effect imports: stylesheets and the custom element's registration.
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css", "@card3d/element"] }]
+  },
+  "overrides": [
+    {
+      // React only lives in @card3d/react (the react plugin includes the rules of hooks).
+      "files": ["packages/react/**/*.tsx"],
+      "plugins": ["react"],
+      "rules": {
+        // The automatic JSX runtime: no React in scope needed.
+        "react/react-in-jsx-scope": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "plugins": ["vitest"],
+      "rules": {
+        // Vitest's expect(value, message).
+        "vitest/valid-expect": ["error", { "maxArgs": 2 }],
+        // close() is the tests' tolerance assertion (it calls expect).
+        "vitest/expect-expect": ["error", { "assertFunctionNames": ["expect", "close"] }],
+        // Table-driven tests branch on the case's kind before asserting.
+        "vitest/no-conditional-expect": "off",
+        // vi.fn infers its type from the implementation it wraps.
+        "vitest/require-mock-type-parameters": "off",
+        // Some tests only check that an input is refused, whatever the message (browser decompression errors vary).
+        "vitest/require-to-throw-message": "off"
+      }
+    }
+  ]
+}

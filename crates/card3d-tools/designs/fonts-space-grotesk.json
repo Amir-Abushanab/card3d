@@ -1,0 +1,6 @@
+{
+  "recipe": { "material": "oxide", "texture": "sandblasted", "color": "#34464a", "polish": 40 },
+  "cardholderName": "Ada Lovelace",
+  "font": "space-grotesk",
+  "finish": { "name": "engraved" }
+}

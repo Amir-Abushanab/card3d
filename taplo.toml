@@ -1,0 +1,16 @@
+# taplo (https://taplo.tamasfe.dev): formats and checks the Rust side's TOML (scripts/check-rust.sh:
+# `taplo fmt --check` and `taplo lint`, which is offline: no schema catalogue). `taplo fmt` formats.
+include = ["*.toml", ".cargo/*.toml", "crates/*/*.toml"]
+
+[formatting]
+# The house line length (rustfmt.toml's max_width).
+column_width = 160
+indent_string = "    "
+# Arrays split over lines stay split (deny.toml's target list, the workspace members); one that
+# outgrows the line is split.
+array_auto_collapse = false
+array_auto_expand = true
+array_trailing_comma = true
+allowed_blank_lines = 1
+# A trailing comment sits one space after its value (no column alignment).
+align_comments = false

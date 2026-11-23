@@ -1,0 +1,41 @@
+{
+  "name": "card-studio",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Design 3D metal cards in the browser",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e",
+    "test": "vitest run",
+    "e2e": "pnpm --filter @card3d/element build:standalone && vite build --logLevel warn && playwright test",
+    "e2e:install": "playwright install chromium"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.9.0",
+    "@card3d/core": "workspace:*",
+    "@codemirror/autocomplete": "^6.20.4",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/legacy-modes": "^6.5.5",
+    "@codemirror/lint": "^6.9.8",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
+    "@lezer/highlight": "^1.2.5",
+    "fflate": "0.8.3",
+    "gifenc": "^1.0.3",
+    "mediabunny": "1.66.0",
+    "pdf-lib": "1.17.1",
+    "tweakpane": "^4.0.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@tweakpane/core": "^2.0.5",
+    "@types/node": "^26.6.6",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

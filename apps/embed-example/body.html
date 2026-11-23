@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>metal-card: fit and card body</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; background: #0b0b10; color: #e8e8ee; font: 15px/1.55 system-ui, sans-serif; }
+      main { max-width: 1040px; margin: 0 auto; padding: 40px 16px 80px; }
+      h1 { font-size: 26px; margin: 0 0 4px; }
+      h2 { font-size: 17px; margin: 40px 0 12px; }
+      p { margin: 0 0 16px; color: #a6a6b4; max-width: 70ch; }
+      code { color: #e8c27a; }
+      .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+      figure { margin: 0; }
+      figcaption { margin-top: 8px; font-size: 13px; color: #8a8a98; }
+      .box { width: 360px; outline: 1px dashed #2a2a36; }
+      #portrait { width: 280px; aspect-ratio: 5 / 8; outline: 1px dashed #2a2a36; }
+    </style>
+    <script type="module" src="/npm/@card3d/element/dist/standalone/metal-card.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Fit and card body</h1>
+      <p><code>fit="contain"</code> (the default) fills the element with a small margin and backs off only as far as a turn needs; <code>fit="studio"</code> keeps Card Studio's camera. The dashed outline is the element's box.</p>
+      <div class="row">
+        <figure>
+          <metal-card id="contain" class="box" material="silver" texture="guilloche" pattern="orbit" name="Ada Lovelace"></metal-card>
+          <figcaption><code>fit="contain"</code> (default)</figcaption>
+        </figure>
+        <figure>
+          <metal-card id="studio" class="box" fit="studio" material="silver" texture="guilloche" pattern="orbit" name="Ada Lovelace"></metal-card>
+          <figcaption><code>fit="studio"</code></figcaption>
+        </figure>
+      </div>
+
+      <h2>Shape, edge, contactless and text lines</h2>
+      <div class="row">
+        <figure>
+          <metal-card
+            id="portrait"
+            design='{"recipe":{"material":"carbon","texture":"none","color":"#1d1d1f"},"cardholderName":"Grace Hopper","shape":{"orientation":"portrait","cornerRadius":0.125,"cutouts":["lanyard"]},"edge":{"finish":"metal","color":"#d4af37","chamfer":true},"finish":{"name":"etched","logo":"etched"},"contactless":{"finish":"etched"},"textLines":[{"text":"•••• 1906","tracking":0.12,"size":0.85}]}'
+          ></metal-card>
+          <figcaption>A portrait black card with a lanyard slot, gold edges, laser-etched marks and a card number.</figcaption>
+        </figure>
+        <figure>
+          <metal-card
+            id="window"
+            class="box"
+            design='{"recipe":{"material":"titanium","texture":"brushed","color":"#c9ced6"},"cardholderName":"Alan Turing","shape":{"cutouts":["window","notch"]},"edge":{"finish":"anodized","color":"#2f6fd6"},"finish":{"name":"engraved"},"contactless":{},"textLines":[{"text":"Valid thru 06/54","size":0.55,"tracking":0.06,"placement":"bottom-right"}]}'
+          ></metal-card>
+          <figcaption>A window and a corner notch, anodised blue edges, an engraved name.</figcaption>
+        </figure>
+      </div>
+    </main>
+  </body>
+</html>

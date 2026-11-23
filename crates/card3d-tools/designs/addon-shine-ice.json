@@ -1,0 +1,5 @@
+{
+  "recipe": { "material": "silver", "texture": "brushed", "color": "#9fb4c8", "polish": 80 },
+  "cardholderName": "Ada Lovelace",
+  "addons": { "shine": { "tone": "ice", "intensity": 1.6, "time": 11.3 } }
+}

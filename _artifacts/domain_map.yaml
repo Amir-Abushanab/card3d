@@ -1,0 +1,198 @@
+# domain_map.yaml (TanStack Intent planning record)
+# Library: the @card3d packages (card3d-workspace)
+# Version: 0.1.0
+# Date: 2026-11-20
+# Status: draft
+
+library:
+  name: card3d-workspace
+  version: 0.1.0
+  repository: https://github.com/Amir-Abushanab/card3d
+  description: 3D metal cards on a Rust + wgpu engine (@card3d/core), the <metal-card> element (@card3d/element) and <MetalCard> for React (@card3d/react)
+  primary_framework: framework-agnostic
+
+domains:
+  - name: Card designs
+    slug: design-model
+    description: The CardDesign JSON every host draws, its validation and share links
+  - name: Face shaders
+    slug: face-shaders
+    description: Custom WGSL face shader layers on a card
+  - name: The card engine
+    slug: engine
+    description: Driving the engine directly (stages, offscreen frames, AR and print exports, bundling)
+  - name: Embedding a card
+    slug: embedding
+    description: Putting a card on a page with the drop-in element or the React component
+
+skills:
+  - name: card-design-json
+    slug: card-design-json
+    domain: design-model
+    description: Write, edit and validate a CardDesign; read and make share links
+    type: core
+    packages:
+      - "@card3d/core"
+    covers:
+      - CardDesign, Recipe and nested field tables (generated references)
+      - CARD_PRESETS, getPreset, presetRecipe, presetExtras, defaultDesign
+      - ensureDesign, lintDesign, describeDesignSpace
+      - encodeDesignToken, decodeDesignToken, stripEmbeddedMedia
+    tasks:
+      - Write a valid CardDesign for a described finish
+      - Validate an untrusted design and explain what was dropped or clamped
+      - Decode or create a Card Studio share link
+    reference_candidates:
+      - topic: every field, range and option; presets; built-in shaders and add-ons; examples
+        reason: generated from designSpaceSections() so they track the installed version
+    failure_modes:
+      - mistake: brass material for a gold card
+        mechanism: material ids are internal names (brass is a warm black); hue comes from recipe.color
+        source: src/describe/fields.ts, src/recipe/defaults.ts
+        priority: HIGH
+        status: active
+      - mistake: texture none without grain 0 and relief 0
+        mechanism: the default grain and relief still render brushed
+        source: src/describe/lint.ts
+        priority: HIGH
+        status: active
+      - mistake: expecting share links to carry uploads
+        mechanism: encodeDesignToken strips data-URL artwork, stickers and font files
+        source: src/design/share.ts, src/design/design.ts
+        priority: MEDIUM
+        status: active
+      - mistake: writing the removed one-off and front-effect keys (bespoke, bespokeParams, frontEffect, objectStyle, effectParams)
+        mechanism: the design model no longer has them; ensureDesign drops them like any unknown key (the card loads as the standard card) and lintDesign reports each as an unknown field
+        source: src/design/design.ts, src/describe/lint.ts
+        priority: MEDIUM
+        status: active
+  - name: custom-face-shaders-wgsl
+    slug: custom-face-shaders-wgsl
+    domain: face-shaders
+    description: Write, port and debug custom WGSL face shader layers
+    type: core
+    packages:
+      - "@card3d/core"
+    covers:
+      - FaceShader with id custom and language wgsl
+      - the WGSL prelude (uniforms, globals, helpers) and annotations
+      - parseCustomShader, lintDesign, EngineStage.checkShader, shaderErrors
+    tasks:
+      - Write a custom WGSL skin or overlay layer with editable params
+      - Fix annotation and WGSL compile errors in a custom layer
+      - Port a GLSL or Shadertoy shader to a card face
+    failure_modes:
+      - mistake: custom layer without language wgsl
+        mechanism: treated as legacy GLSL and skipped; engineDraws is false
+        source: src/engine.ts, src/types.ts
+        priority: CRITICAL
+        status: active
+      - mistake: checkShader before the first setDesign
+        mechanism: resolves an empty list without checking
+        source: src/engine.ts
+        priority: MEDIUM
+        status: active
+  - name: engine-stage
+    slug: engine-stage
+    domain: engine
+    description: Build pages, editors and export pipelines on createEngineStage and createOffscreenStage
+    type: core
+    packages:
+      - "@card3d/core"
+    covers:
+      - createEngineStage, EngineStage, createOffscreenStage, OffscreenStage
+      - CAMERA_PATHS, cameraPathPose, cameraPathTime
+      - exportAr, arSupport, openQuickLook, sceneViewerUrl
+      - bakePrint, cardDieline, dielineSvg
+      - mountMarquee, createPublicAssets, bundler and serving notes
+    tasks:
+      - Mount an interactive card on a canvas with createEngineStage
+      - Export a PNG, a video frame sequence or an AR model of a design
+      - Bundle or self-host the engine files
+    failure_modes:
+      - mistake: holding the original canvas after a WebGL fall-over
+        mechanism: the loader replaces the canvas in the DOM; onCanvas / stage.canvas give the new one
+        source: src/engine.ts, wasm/loader.js
+        priority: HIGH
+        status: active
+      - mistake: one stage per card in a long grid
+        mechanism: each stage holds a GPU context; browsers drop the oldest past about 16 WebGL contexts
+        source: packages/element/src/pool.ts, README.md
+        priority: HIGH
+        status: active
+  - name: embed-metal-card
+    slug: embed-metal-card
+    domain: embedding
+    description: Put a card on a page with <metal-card> from a CDN or npm
+    type: core
+    packages:
+      - "@card3d/element"
+    covers:
+      - attributes, design sources and precedence, the design property
+      - events, element API, the context pool
+      - self-hosting, wasm MIME type, caching, Content-Security-Policy
+    tasks:
+      - Embed a card designed in Card Studio from a CDN
+      - Install and use <metal-card> with a bundler
+      - Show many cards on one page within GPU limits
+      - Serve the CDN bundle under a Content-Security-Policy
+    failure_modes:
+      - mistake: self-hosting only metal-card.js or renaming it
+        mechanism: the chunks import ./metal-card.js and the engine loads from engine/ next to it
+        source: README.md
+        priority: HIGH
+        status: active
+      - mistake: strict style-src without unsafe-inline
+        mechanism: the element styles its shadow root with a style element
+        source: src/element.ts
+        priority: MEDIUM
+        status: active
+  - name: metal-card-react
+    slug: metal-card-react
+    domain: embedding
+    description: Render a card in React with <MetalCard>
+    type: framework
+    packages:
+      - "@card3d/react"
+    covers:
+      - MetalCardProps, onReady, onError, the element ref
+      - SSR and the use client boundary
+      - attributes without props (ar, ar-src, ios-src, environment, floor)
+    tasks:
+      - Render a card from a Card Studio design in a React component
+      - Control the card imperatively through its ref
+      - Use the card in a Next.js server-rendered page
+    failure_modes:
+      - mistake: passing callbacks from a server component
+        mechanism: functions don't cross the server / client boundary
+        source: src/index.tsx
+        priority: MEDIUM
+        status: active
+
+cross_references:
+  - from: custom-face-shaders-wgsl
+    to: card-design-json
+    reason: a custom layer is one entry of CardDesign.shaders
+  - from: engine-stage
+    to: card-design-json
+    reason: stages draw CardDesigns
+  - from: embed-metal-card
+    to: card-design-json
+    reason: the element's design sources are CardDesigns (the skill ships in @card3d/core)
+  - from: metal-card-react
+    to: embed-metal-card
+    reason: the component is a thin wrapper; behaviour, AR and serving are the element's
+
+gaps:
+  - skill: embed-metal-card
+    question: Do consumer agents installing only @card3d/element discover the card-design-json skill of its @card3d/core dependency under pnpm (not hoisted)?
+    context: the element and React skills point to it by name. Checked 2026-11-20 with the packed tarballs in a scratch pnpm project; `intent list` shows @card3d/core's three skills beside the element's.
+    status: resolved
+  - skill: metal-card-react
+    question: Does a project that installs only @card3d/react discover @card3d/element#embed-metal-card, its package-qualified prerequisite?
+    context: maintainer check verifies local prerequisite slugs only. Checked 2026-11-20 with the packed tarballs in a scratch pnpm project depending only on @card3d/react (element and core resolved from their tarballs); `intent list` shows all three packages' five skills and `intent load @card3d/element#embed-metal-card` prints it.
+    status: resolved
+  - skill: custom-face-shaders-wgsl
+    question: No fresh-consumer task check has been run for any skill yet
+    context: structural validation and typechecked examples only
+    status: open

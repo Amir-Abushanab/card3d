@@ -1,0 +1,25 @@
+node_modules
+dist
+.DS_Store
+*.log
+# local reference material, never commit
+.reference/
+# notes, specs, research and plans: local only, never commit
+docs/
+# e2e artefacts (Playwright)
+apps/studio/e2e/.results/
+playwright-report/
+test-results/
+# copied into each package by its prepack script (scripts/package-notices.mjs)
+packages/*/LICENSE
+packages/*/THIRD_PARTY_NOTICES.md
+# pnpm pack output
+*.tgz
+# Rust build output
+/target/
+packages/core/wasm/pkg/
+packages/core/wasm/pkg-webgl/
+crates/card3d-tools/out/
+crates/card3d-tools/out-*/
+# archived code and files: local reference only, never commit
+.archive/
