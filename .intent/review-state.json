@@ -625,18 +625,15 @@
       ]
     },
     "source:knip.jsonc": {
-      "fingerprint": "84950fe950f6aec24605384ad4c612cf1cf8b80aa3100004f279152fc967ffd1",
+      "fingerprint": "13cdb9d2baf01829467827e23318790dff9156e2ec02fc478c50ce4c65bc65a3",
       "snapshot": {
-        "knip.jsonc": "94d12c6f841d175d29f6d9645fc6c0010157fec38f5f03b9f1080f9908bbe655"
+        "knip.jsonc": "49b859118991ad5f7e2101729bc19ae5ef1394f3bf6f4f6f916980d73b773495"
       },
-      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "head": "ee282f94808be4de47ae4d7a5671996bef9fef60",
       "outcome": "no-change",
-      "reason": "Repo config: split-preload.mjs is a knip entry.",
+      "reason": "knip.jsonc only: the tools package's playwright dependency is listed as used (loaded through createRequire) now that CI no longer runs playwright install there. No library code or guidance involved.",
       "evidence": [
-        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
-        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
-        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
-        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+        "Changed: knip.jsonc at ee282f94808be4de47ae4d7a5671996bef9fef60"
       ]
     },
     "source:packages/core/src/engine-parts.test.ts": {
