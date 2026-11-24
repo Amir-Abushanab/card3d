@@ -26,7 +26,11 @@ export interface PoolMember {
 }
 
 class ContextPool {
-  /** Default 12: leaves headroom under the browsers' 16 for the page's own WebGL. */
+  /**
+   * Default 12: leaves headroom under the browsers' 16 for the page's own WebGL. It holds on the
+   * WebGPU build too, although its cards share one device and no context limit applies there: a lost
+   * device moves every live card to the WebGL build at once, and those contexts must fit.
+   */
   limit = 12;
   private readonly live = new Set<PoolMember>();
   private readonly waiting = new Set<PoolMember>();

@@ -5,7 +5,8 @@
 //   browsers download it);
 // - WebGPU starts but fails (the device, a pipeline, or a panic while building the card), or later
 //   loses its device or reports an error: the card moves to the WebGL build on a fresh canvas (a
-//   canvas that has had a WebGPU context can't get a WebGL one);
+//   canvas that has had a WebGPU context can't get a WebGL one). The page's cards share one WebGPU
+//   device (each canvas its own surface), so a lost device moves every card on it;
 // - the tab crashes while WebGPU starts (reported for some iOS 26 devices): JavaScript can't catch
 //   that, so a "starting" mark is kept in localStorage while WebGPU starts. It is cleared once the
 //   page's last start in flight is 2 s past its first frame (or disposed), and also whenever the page
@@ -876,7 +877,7 @@ export async function createCard(
     simulateDeviceLoss() {
       stage?.simulateDeviceLoss();
     },
-    /** Frees the engine's stage (its GPU device goes with it) and stops watching it. */
+    /** Frees the engine's stage (its WebGL context goes with it; WebGPU's device is the page's) and stops watching it. */
     dispose() {
       clearInterval(watch);
       for (const p of players) p.stop();
