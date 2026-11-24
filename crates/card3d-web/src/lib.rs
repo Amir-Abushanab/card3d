@@ -10,6 +10,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
+use card3d_engine::card::BuildKey;
 use card3d_engine::interaction::{CardRotation, InteractionEvent};
 use card3d_engine::marquee::Marquee;
 use card3d_engine::quality::Quality;
@@ -98,6 +99,24 @@ mod build {
     pub(crate) const PRINT: u32 = 2;
     pub(crate) const AR: u32 = 3;
     pub(crate) const CHECK: u32 = 4;
+}
+
+/// What a build's images (`CardStage::build`) say about the card besides the design (`BuildKey`): the
+/// keys of the decoded files, which a key's source names (one source, one file), and the strings
+/// whole (the name font's family).
+fn assets(images: Option<&js_sys::Map>) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Some(m) = images {
+        m.for_each(&mut |v, k| {
+            let k = k.as_string().unwrap_or_default();
+            out.push(match v.as_string() {
+                Some(v) => format!("{k}={v}"),
+                None => k,
+            });
+        });
+    }
+    out.sort();
+    out
 }
 
 /// `CardStage.mcall` operations on a card's stage (the marquee has its own, `marquee::op`).
@@ -311,7 +330,8 @@ impl CardStage {
                 let errors = card3d_engine::face_shaders::check_custom(&gpu.device, design).await.map_err(load_error)?;
                 return Ok(JsValue::from_str(&errors));
             }
-            let design = CardDesign::from_json(&design).map_err(|e| JsValue::from_str(&e))?;
+            let doc = card3d_engine::json::parse(&design).map_err(|e| JsValue::from_str(&format!("card design: {e}")))?;
+            let design = CardDesign::from_value(&doc).map_err(|e| JsValue::from_str(&e))?;
             let (options, format) = match kind {
                 build::PRINT | build::AR => (
                     CardOptions { quality: Quality::Full, custom_font_family: font_family, print: true, ..Default::default() },
@@ -326,6 +346,17 @@ impl CardStage {
                     (options, gpu.format)
                 }
             };
+            // The stage's card takes a design that differs from its own only in values it can change in
+            // place (`Stage::retune`) without a build.
+            let key = (kind == build::DESIGN).then(|| BuildKey::new(doc, &options, assets(images.as_ref()))).flatten();
+            if let (Some(key), Scene::Card(s)) = (&key, &mut view.borrow_mut().scene) {
+                if latest.get() != mine {
+                    return Ok(JsValue::FALSE);
+                }
+                if failure.get().is_none() && s.retune(key, &design) {
+                    return Ok(JsValue::TRUE);
+                }
+            }
             let card = CardRenderer::new(&gpu.device, &gpu.queue, format, &design, &BrowserHost { images }, &options).await;
             if let Some(f) = failure.get() {
                 return Err(JsValue::from_str(&f));
@@ -349,7 +380,10 @@ impl CardStage {
             }
             Ok(JsValue::from_bool(match &mut view.borrow_mut().scene {
                 Scene::Card(s) if kind == build::DESIGN && latest.get() == mine => {
-                    s.install(card);
+                    match key {
+                        Some(key) => s.install_keyed(card, key),
+                        None => s.install(card),
+                    }
                     true
                 }
                 Scene::Marquee(m) if kind == build::SLOT => m.install(a as usize, b as u32, card),

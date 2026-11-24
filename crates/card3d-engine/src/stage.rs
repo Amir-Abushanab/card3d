@@ -9,7 +9,7 @@
 use glam::{DVec3, Mat4, Vec3};
 
 use crate::canvas::Host;
-use crate::card::{CardOptions, CardRenderer};
+use crate::card::{BuildKey, CardOptions, CardRenderer};
 use crate::design::CardDesign;
 use crate::interaction::{CardInteraction, CardRotation, InteractionEvent, InteractionFrame, InteractionOptions};
 use crate::quality::Quality;
@@ -115,6 +115,8 @@ pub fn contain_distance(points: &[Vec3], fov_deg: f64, aspect: f64, k: f64) -> f
 pub struct Stage {
     pub options: StageOptions,
     card: Option<CardRenderer>,
+    /// What the card was built from (`install_keyed`), for `retune`.
+    built: Option<BuildKey>,
     /// The card's box corners in its own space (contain), and its half-size when taller than standard (studio).
     corners: Vec<Vec3>,
     tall_half: Option<(f64, f64)>,
@@ -140,6 +142,7 @@ impl Stage {
         Stage {
             options,
             card: None,
+            built: None,
             corners: Vec::new(),
             tall_half: None,
             slot_euler: [0.0; 3],
@@ -166,6 +169,7 @@ impl Stage {
     /// async on the web, so the host builds it with `card_options` and the current card stays on screen
     /// meanwhile).
     pub fn install(&mut self, next: CardRenderer) {
+        self.built = None;
         // `measureCard`.
         self.corners = next.renderer.local_box().map_or_else(Vec::new, |(a, b)| {
             (0..8).map(|k| Vec3::new(if k & 4 == 0 { a.x } else { b.x }, if k & 2 == 0 { a.y } else { b.y }, if k & 1 == 0 { a.z } else { b.z })).collect()
@@ -186,6 +190,23 @@ impl Stage {
                 ..Default::default()
             }));
             self.intro_pending = true;
+        }
+    }
+
+    /// `install` for a card built from `key` (`BuildKey::new` with the card's options), which `retune`
+    /// can then change in place.
+    pub fn install_keyed(&mut self, next: CardRenderer, key: BuildKey) {
+        self.install(next);
+        self.built = Some(key);
+    }
+
+    /// Shows `design` without a build when the card was built from the same `key` (`install_keyed`):
+    /// the design then differs from the card's only in values it takes in place
+    /// (`CardRenderer::retune`). False when it needs a build.
+    pub fn retune(&mut self, key: &BuildKey, design: &CardDesign) -> bool {
+        match (&self.built, &mut self.card) {
+            (Some(built), Some(card)) if built == key => card.retune(design),
+            _ => false,
         }
     }
 

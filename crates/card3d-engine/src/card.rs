@@ -12,6 +12,7 @@ use crate::design::CardDesign;
 use crate::edge;
 use crate::geometry::{self, BODY_DEPTH, CHIP_DEPTH_NATIVE, CHIP_SCALE};
 use crate::iso;
+use crate::json::{Map, Value};
 use crate::material::{self, srgb_hex_to_linear};
 use crate::renderer::{Item, Material, Renderer, Wrap};
 use crate::shape;
@@ -52,6 +53,57 @@ pub struct SharedCards {
 impl std::fmt::Debug for SharedCards {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("SharedCards")
+    }
+}
+
+/// The recipe keys whose values a built card takes in place (`CardRenderer::retune`): its foils'
+/// uniform values, which only `holo::sides` reads. A side gaining or losing its foil still needs a
+/// build. A key added here must change nothing but uniforms that `retune` sets.
+const RETUNABLE: [&str; 14] = [
+    "holoStyle",
+    "foilTexture",
+    "foilIntensity",
+    "holoGlare",
+    "holoMotion",
+    "foilScale",
+    "foilCoverage",
+    "backHoloStyle",
+    "backFoilTexture",
+    "backFoilIntensity",
+    "backHoloGlare",
+    "backHoloMotion",
+    "backFoilScale",
+    "backFoilCoverage",
+];
+
+/// What a card is built from but for the values it takes in place (`CardRenderer::retune`): the
+/// design's JSON without the `RETUNABLE` recipe keys, the card's options, and what else the host
+/// supplies for it (`assets`; the web's: its images' sources). Cards built with equal keys differ only
+/// in those values.
+#[derive(Debug, PartialEq)]
+pub struct BuildKey {
+    design: Value,
+    options: (crate::quality::Quality, Option<String>, bool, bool, Option<u32>, bool),
+    assets: Vec<String>,
+}
+
+impl BuildKey {
+    /// `None` for a card of a frame's (`CardOptions::shared`), which is never retuned.
+    pub fn new(mut design: Value, options: &CardOptions, assets: Vec<String>) -> Option<BuildKey> {
+        // Every option, so that a new one can't be left out of the key.
+        let CardOptions { quality, custom_font_family, reduced_motion, keep_chip_bright, face_width, shared, print } = options;
+        if shared.is_some() {
+            return None;
+        }
+        if let Value::Object(Map(members)) = &mut design {
+            for (k, v) in members.iter_mut() {
+                if let (true, Value::Object(Map(recipe))) = (k == "recipe", v) {
+                    recipe.retain(|(k, _)| !RETUNABLE.contains(&k.as_str()));
+                }
+            }
+        }
+        let options = (*quality, custom_font_family.clone(), *reduced_motion, *keep_chip_bright, *face_width, *print);
+        Some(BuildKey { design, options, assets })
     }
 }
 
@@ -487,6 +539,24 @@ impl CardRenderer {
         let body = (options.print && !glass).then_some(body_mesh);
         let material = options.print.then_some(m);
         Ok(CardRenderer { renderer: r, frame, stickers, faces, shine, vines, staging, _surface: shared_surface, body, material })
+    }
+
+    /// Takes `design`'s foil values (each side's style, texture, intensity, glare, motion, scale and
+    /// coverage) in place: all that tells it from the design this card was built from when their
+    /// `BuildKey`s are equal. False, changing nothing, when a side would gain or lose its foil.
+    pub fn retune(&mut self, design: &CardDesign) -> bool {
+        let (front, back) = crate::holo::sides(&design.recipe);
+        let holo = &mut self.renderer.holo;
+        let has = |front: bool| holo.iter().flatten().any(|h| h.front == front);
+        if has(true) != front.is_some() || has(false) != back.is_some() {
+            return false;
+        }
+        for h in holo.iter_mut().flatten() {
+            if let Some(values) = if h.front { front } else { back } {
+                h.values = values;
+            }
+        }
+        true
     }
 
     /// Face shader layers that couldn't be built (custom code that doesn't parse or compile).

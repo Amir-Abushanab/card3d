@@ -175,11 +175,13 @@ pub struct DecalLook {
 }
 
 /// A holo foil draw (`holo/`): one side's values, and whether it is the bevel foil (with its side).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct HoloDraw {
     pub values: crate::holo::HoloValues,
     pub edge_only: bool,
     pub edge_side: f32,
+    /// The front's foil, else the back's (`CardRenderer::retune` sets each side's values).
+    pub front: bool,
 }
 
 #[repr(C)]
