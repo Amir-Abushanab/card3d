@@ -217,6 +217,18 @@
       "evidence": [
         "No changed files at 0135a412774ef82fd86609ff04d67241cf540c4e"
       ]
+    },
+    "source:crates/card3d-engine/shaders/liquid-metal.wgsl": {
+      "fingerprint": "ecf940bdc723c7479d8e5875bad5433bc6bf898cfb298c29478083fc6a99ece2",
+      "snapshot": {
+        "crates/card3d-engine/shaders/liquid-metal.wgsl": "0616e7774e1e1ed4a3a44d7200b96a589f7e2cb69c5ea036a3d0dc30ece9db2f"
+      },
+      "head": "15350c7368b0b8374d811849fdb586e1893bfdf1",
+      "outcome": "no-change",
+      "reason": "Internal shader fix only: getImgFrame's zero-width smoothstep (undefined, 0 on lavapipe, hiding a mark-masked liquid-metal layer) replaced by an explicit inside-the-unit-square test. Same output on Metal (native renders of face-liquid-metal-mark byte-identical before/after) and now on lavapipe/SwiftShader (CI harness passes). No parameter, default or behaviour that card-design-json's shaders-and-effects/presets references describe changed.",
+      "evidence": [
+        "Changed: crates/card3d-engine/shaders/liquid-metal.wgsl at 15350c7368b0b8374d811849fdb586e1893bfdf1"
+      ]
     }
   }
 }
