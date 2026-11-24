@@ -3,9 +3,9 @@
   "baseline": "0135a412774ef82fd86609ff04d67241cf540c4e",
   "items": {
     "skill:packages/core/skills/card-design-json/SKILL.md": {
-      "fingerprint": "d1aae5806b11713e6f96ba1fdf87523757b4696d9772c54309dccbe3aa6c2463",
+      "fingerprint": "e60a55bd1d87414ab20b3bd9709882da9effde908f82bf22cec1ceacfe1e6598",
       "snapshot": {
-        "packages/core/skills/card-design-json/SKILL.md": "c2ba812c7a16a294a9389fc31b61b50c48f37d6b0160c196956d0b4a349e105a",
+        "packages/core/skills/card-design-json/SKILL.md": "5c5176e7f34fc500a518b61d3c7e193c6e2a20f6bf87a734267241ea85234659",
         "packages/core/skills/card-design-json/references/design-fields.md": "acb93f9ac2df0062894df5e416b00c715ee312b7023374eedb4258eec5cba254",
         "packages/core/skills/card-design-json/references/examples.md": "e43cc626d6d61820693e5bfe51bc8cca8966af89b32cbf4b61adc5deab75f8cd",
         "packages/core/skills/card-design-json/references/presets.md": "78240aea16d12efdc9ad51f37ff03116867551aff9d90de1d6ed66a523124dea",
@@ -28,19 +28,19 @@
         "packages/core/src/recipe/defaults.ts": "8f1f06bc4b92ed3d934fca7d1ac24be9d20dd6c3b0243a658ff666d83cd2e8c4",
         "packages/core/src/types.ts": "3882a45ca4228b933c611151cb4cbe841fe088ea2841a5ca23d57249b28f27c8"
       },
-      "head": "bbd2610edbc1b6b107270aacc6e60ddb17e8ec06",
+      "head": "882d223dfc57bb0332f7e541af2357bab3c30fb9",
       "outcome": "updated",
-      "reason": "The studio's public URL moved from card-studio.pages.dev (another project's site) to card3d-studio.pages.dev. The skills, READMEs and tests that quote a share link now use the new host; share tokens and parsing are unchanged.",
+      "reason": "Rebased onto 0.1.1: the skills' library_version moved to 0.1.1 on main (the Version PR), on top of this branch's already-reviewed guidance updates (engine-stage: when the engine downloads, parts prefetched together, WebGPU stages share a device; metal-card-react: a design object edited in place isn't re-read; stage-api: what setPaused stops). Planning records already carry those entries.",
       "evidence": [
-        "Changed: packages/core/skills/card-design-json/SKILL.md, packages/core/src/design/share.test.ts at bbd2610edbc1b6b107270aacc6e60ddb17e8ec06"
+        "Changed: packages/core/skills/card-design-json/SKILL.md at 882d223dfc57bb0332f7e541af2357bab3c30fb9"
       ]
     },
     "skill:packages/core/skills/custom-face-shaders-wgsl/SKILL.md": {
-      "fingerprint": "87f35e2befa31773e63c2353a785eaf11c1ab7e050be4f21c7eec411f207f615",
+      "fingerprint": "6612e0dd5acd5d578873841a53d53f83a3288861e34e671eea932b628fd8df59",
       "snapshot": {
         "crates/card3d-engine/shaders/face/prelude.wgsl": "63c27f150678f7e40847a7ccaaf1b7eeeafba44dc60c91425bb2759a6c3f20fb",
         "crates/card3d-engine/src/face_custom.rs": "ce8eee2c04f4f92c3b788981a34f8c9431a116c45f127c51c89f9ac24e5cd270",
-        "packages/core/skills/custom-face-shaders-wgsl/SKILL.md": "434babef8aef75fae06a3b551d2cfd1d65959ff796ab1e0bcb92a9f10dad873d",
+        "packages/core/skills/custom-face-shaders-wgsl/SKILL.md": "d9135cbc98df0829b26f10ac5e61b8be7a16364047ee62174e1370a280517dab",
         "packages/core/skills/custom-face-shaders-wgsl/references/prelude.md": "e964ab52a19989592a979b8721e23df3e372e287c58afd5bac6040a2af773b64",
         "packages/core/src/design/sanitize.ts": "c455f35cd1ffa0b259e7586be7476ca7fdc344b70dd6ddb678443a4de718b70e",
         "packages/core/src/shaders/custom-parse.ts": "a9d6cb66fd709661ed525be965a17f3aaafa2adb0505da5d0f33a1e12a08b709",
@@ -58,18 +58,18 @@
         "packages/core/src/shaders/types.ts": "7242a3897a85c9b6e9b632cb543db276be18b580e70faabb56a88773d74121a5",
         "packages/core/src/shaders/wgsl-examples.ts": "c47ce7dfda1d1dada54ec1eb49694ceccee9a66875c53ca7f348ebe0fd61f40b"
       },
-      "head": "0135a412774ef82fd86609ff04d67241cf540c4e",
+      "head": "882d223dfc57bb0332f7e541af2357bab3c30fb9",
       "outcome": "updated",
-      "reason": "Initial skill batch 1 (2026-11-20): card-design-json, custom-face-shaders-wgsl, engine-stage, embed-metal-card and metal-card-react, and the _artifacts planning records, authored from the @card3d/* sources at this commit (after the 2026-11-23 removal of the one-off cards and front effects: skill_spec.md, Coverage and batch history); generated references from designSpaceSections() via scripts/skill-references.mjs. Checks: intent validate passes (5 skills, TS fences typechecked), skill-references --check current, pnpm pack:check ships every skill file, intent list in a scratch pnpm project shows the transitive skills. Not run: fresh-consumer task checks (skill_spec.md, Remaining work).",
+      "reason": "Rebased onto 0.1.1: the skills' library_version moved to 0.1.1 on main (the Version PR), on top of this branch's already-reviewed guidance updates (engine-stage: when the engine downloads, parts prefetched together, WebGPU stages share a device; metal-card-react: a design object edited in place isn't re-read; stage-api: what setPaused stops). Planning records already carry those entries.",
       "evidence": [
-        "No changed files at 0135a412774ef82fd86609ff04d67241cf540c4e"
+        "Changed: packages/core/skills/custom-face-shaders-wgsl/SKILL.md at 882d223dfc57bb0332f7e541af2357bab3c30fb9"
       ]
     },
     "skill:packages/core/skills/engine-stage/SKILL.md": {
-      "fingerprint": "1f0966bfe9deba778c17c23ec6e16df4e235b34d24096bb60e93197c1dbffa8b",
+      "fingerprint": "868db5d27af91adb1a91b40749e43e8a898211561f02303fd3434d2873b7800e",
       "snapshot": {
         "packages/core/README.md": "c07cffca224b4bfa0d04b904d36b2a2db5d9b61143ee40a14b4ceacdff0e276f",
-        "packages/core/skills/engine-stage/SKILL.md": "6483e9d84be879ee1a17feab95a1c30c0de90e02b82af73e370219db7f3a15a9",
+        "packages/core/skills/engine-stage/SKILL.md": "2d49a91cc737f485937970387ef051bc2e3e299261ee36e21b0c4a48444de8aa",
         "packages/core/skills/engine-stage/references/exports.md": "951a050e8a701747359c56c0a0ff93612ef2a77dd5275bd8c847ff83a675fcb1",
         "packages/core/skills/engine-stage/references/stage-api.md": "09fc29611d0d07f7e2ae66bdd6ddc4ed7ceec29ef2c119070f5234ee1f2d9256",
         "packages/core/src/ar/ar.test.ts": "de91bb2a74719bd3797ac1f0261eab5d1344216ff50e8d395e5af74f9da82cbe",
@@ -88,23 +88,18 @@
         "packages/core/src/scene/camera-paths.ts": "ace251438f75194855ba955d14538a258b59b86fa5f43fbe4fe55b09012adc72",
         "packages/core/src/standalone.ts": "6a701844d6578fb05b4c20dc43536b620f3451c6036f43d859527a150b65a754"
       },
-      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "head": "882d223dfc57bb0332f7e541af2357bab3c30fb9",
       "outcome": "updated",
-      "reason": "The loader now downloads the engine parts a design needs together, as the design is set (was: each when the build reached it), and on WebGPU a page's stages share one device, so a lost device moves every stage to the WebGL build (was: only the stage whose device it was). SKILL.md's overview and many-cards entry, and core's README, now say so; stage API, options and callbacks unchanged.",
+      "reason": "Rebased onto 0.1.1: the skills' library_version moved to 0.1.1 on main (the Version PR), on top of this branch's already-reviewed guidance updates (engine-stage: when the engine downloads, parts prefetched together, WebGPU stages share a device; metal-card-react: a design object edited in place isn't re-read; stage-api: what setPaused stops). Planning records already carry those entries.",
       "evidence": [
-        "packages/core/wasm/loader.js (engineParts, preloadParts)",
-        "crates/card3d-web/src/lib.rs (page device)",
-        "crates/card3d-web/web/fallback.test.mjs: two cards on one device fall over together (passed)",
-        "intent validate: 5 skills passed",
-        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch",
-        "Fresh-consumer check not run (skill_spec.md, Remaining work)"
+        "Changed: packages/core/skills/engine-stage/SKILL.md at 882d223dfc57bb0332f7e541af2357bab3c30fb9"
       ]
     },
     "skill:packages/element/skills/embed-metal-card/SKILL.md": {
-      "fingerprint": "5a0e70e2d0f8c7fe52c216a1e1a51e711f1e49ea99ee8f8df24786815c2b861d",
+      "fingerprint": "c71f4fe1cf1e205d09da5118d0d293778ed6d3a1e90fab19687063b68c488eec",
       "snapshot": {
         "packages/element/README.md": "e56b162c746d539ab5b3bcd74f14e80b6a0ce9ff5227a56cd58bb5032f3cd539",
-        "packages/element/skills/embed-metal-card/SKILL.md": "9353b02b4ea6cac30c4426abfeb0e7866a152aba7fcd5a72de5601595d411943",
+        "packages/element/skills/embed-metal-card/SKILL.md": "bd732b368391ba4433771979c76ac1d10a485de76430e6646b7e4c51a50c5908",
         "packages/element/skills/embed-metal-card/references/attributes.md": "3ef2941769cfa511bf525dee81804bd28e3ab5776c96a2a434868419fac7bd86",
         "packages/element/skills/embed-metal-card/references/serving-and-csp.md": "75f0876a0a9596295965223a339cc6eb3f6c05a8a7aca97c2a60759c231c58bc",
         "packages/element/src/attributes.test.ts": "b355b64edd423f1180e08f14ab95ec92560dd119b81b20fb4c777186ec0d396e",
@@ -115,31 +110,29 @@
         "packages/element/src/standalone.ts": "546e056b32e3473d013e960257cf7f7bfe95a4a1e787052666f13466b527447e",
         "packages/element/vite.standalone.config.ts": "a9fe104bea21327fa38d1cb97ed7676ad851bd8d24a9257dbb076985f821299b"
       },
-      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
-      "outcome": "no-change",
-      "reason": "packages/element/src/pool.ts changed only in its doc comment (why the 12-card limit holds on WebGPU too). The skill's statement (at most 12 live cards, maxContexts, lower it with other WebGL) stays accurate.",
+      "head": "882d223dfc57bb0332f7e541af2357bab3c30fb9",
+      "outcome": "updated",
+      "reason": "Rebased onto 0.1.1: the skills' library_version moved to 0.1.1 on main (the Version PR), on top of this branch's already-reviewed guidance updates (engine-stage: when the engine downloads, parts prefetched together, WebGPU stages share a device; metal-card-react: a design object edited in place isn't re-read; stage-api: what setPaused stops). Planning records already carry those entries.",
       "evidence": [
-        "git diff 2978b60..HEAD -- packages/element/src/pool.ts: comment only",
-        "intent validate: 5 skills passed",
-        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+        "Changed: packages/element/skills/embed-metal-card/SKILL.md at 882d223dfc57bb0332f7e541af2357bab3c30fb9"
       ]
     },
     "skill:packages/react/skills/metal-card-react/SKILL.md": {
-      "fingerprint": "92d67ec2c7b3d9574c2d7890d0f0067c203f1cb3359147931698a4f6a7c8fa6e",
+      "fingerprint": "966f18d9ff40770bfb965a7210fa8ea421451a145a04a611eaced52e1301758f",
       "snapshot": {
         "packages/react/README.md": "9643c03677036a1ef6315b4a4bde8c864b1ed541c0e4f68fce3c31b4f0764553",
-        "packages/react/skills/metal-card-react/SKILL.md": "be41291cfcaf95a9e0f318d70792ef4299af4319c29c3aa16c1b85e0d2666036",
+        "packages/react/skills/metal-card-react/SKILL.md": "3d86ec30fdbaa0d13f2a0d5e7fd8251034d63a503e32f9f1bcbe74c35e7bd871",
         "packages/react/src/index.tsx": "a985949224b47db69666e4d3cf6e6030a9443c513110e32fd27b2e494529367a"
       },
-      "head": "740b9c8e64c43932281acd7a5819bf1094771868",
+      "head": "882d223dfc57bb0332f7e541af2357bab3c30fb9",
       "outcome": "updated",
-      "reason": "<MetalCard> now serialises an object design only when it is a new object (useMemo by reference) instead of on every render. The common-mistakes entry said a new object every render is 'compared by JSON' and to memoise heavy designs; it now also says the same object isn't serialised again, so an in-place edit doesn't reach the card.",
+      "reason": "Rebased onto 0.1.1: the skills' library_version moved to 0.1.1 on main (the Version PR), on top of this branch's already-reviewed guidance updates (engine-stage: when the engine downloads, parts prefetched together, WebGPU stages share a device; metal-card-react: a design object edited in place isn't re-read; stage-api: what setPaused stops). Planning records already carry those entries.",
       "evidence": [
-        "Checks at 740b9c8: intent validate (5 skills) and skill-references --check pass; pnpm check passes (format, lint, typecheck, knip, depcruise, notices, all unit tests incl. packages/react SSR tests and packages/core/src/webgpu-marks.test.ts); crates/card3d-web/web/fallback.test.mjs passes all 9 checks; studio e2e specs embed, stickers, showcase, studio, fonts, clip, print pass. Not run: fresh-consumer task checks (skill_spec.md, Remaining work)."
+        "Changed: packages/react/skills/metal-card-react/SKILL.md at 882d223dfc57bb0332f7e541af2357bab3c30fb9"
       ]
     },
     "planning:_artifacts": {
-      "fingerprint": "fc3600f013d96f589bdb865f3e699d7ca110693422f4fc22c1f94422a5090fe3",
+      "fingerprint": "92087b5f4605c885fce6eb0e5f8343807aeb61aba706d096af28b20d569a5937",
       "snapshot": {
         "_artifacts/domain_map.yaml": "c589256bfa75937f3bfcf2729393162193f647ef7248de8f5abbbf2c7c522933",
         "_artifacts/skill_spec.md": "cc44e1bbe51f04c267aed6d933865cd65e6d3514ac63a89a70033285c92d0663",
@@ -147,14 +140,14 @@
         "crates/card3d-engine/shaders/face/prelude.wgsl": "63c27f150678f7e40847a7ccaaf1b7eeeafba44dc60c91425bb2759a6c3f20fb",
         "crates/card3d-engine/src/face_custom.rs": "ce8eee2c04f4f92c3b788981a34f8c9431a116c45f127c51c89f9ac24e5cd270",
         "packages/core/README.md": "c07cffca224b4bfa0d04b904d36b2a2db5d9b61143ee40a14b4ceacdff0e276f",
-        "packages/core/skills/card-design-json/SKILL.md": "c2ba812c7a16a294a9389fc31b61b50c48f37d6b0160c196956d0b4a349e105a",
+        "packages/core/skills/card-design-json/SKILL.md": "5c5176e7f34fc500a518b61d3c7e193c6e2a20f6bf87a734267241ea85234659",
         "packages/core/skills/card-design-json/references/design-fields.md": "acb93f9ac2df0062894df5e416b00c715ee312b7023374eedb4258eec5cba254",
         "packages/core/skills/card-design-json/references/examples.md": "e43cc626d6d61820693e5bfe51bc8cca8966af89b32cbf4b61adc5deab75f8cd",
         "packages/core/skills/card-design-json/references/presets.md": "78240aea16d12efdc9ad51f37ff03116867551aff9d90de1d6ed66a523124dea",
         "packages/core/skills/card-design-json/references/shaders-and-effects.md": "cdb0d669c7f509e93304e935456dca20e82c0cdb5fb9015ed51fddff73c140cb",
-        "packages/core/skills/custom-face-shaders-wgsl/SKILL.md": "434babef8aef75fae06a3b551d2cfd1d65959ff796ab1e0bcb92a9f10dad873d",
+        "packages/core/skills/custom-face-shaders-wgsl/SKILL.md": "d9135cbc98df0829b26f10ac5e61b8be7a16364047ee62174e1370a280517dab",
         "packages/core/skills/custom-face-shaders-wgsl/references/prelude.md": "e964ab52a19989592a979b8721e23df3e372e287c58afd5bac6040a2af773b64",
-        "packages/core/skills/engine-stage/SKILL.md": "6483e9d84be879ee1a17feab95a1c30c0de90e02b82af73e370219db7f3a15a9",
+        "packages/core/skills/engine-stage/SKILL.md": "2d49a91cc737f485937970387ef051bc2e3e299261ee36e21b0c4a48444de8aa",
         "packages/core/skills/engine-stage/references/exports.md": "951a050e8a701747359c56c0a0ff93612ef2a77dd5275bd8c847ff83a675fcb1",
         "packages/core/skills/engine-stage/references/stage-api.md": "09fc29611d0d07f7e2ae66bdd6ddc4ed7ceec29ef2c119070f5234ee1f2d9256",
         "packages/core/src/ar/ar.test.ts": "de91bb2a74719bd3797ac1f0261eab5d1344216ff50e8d395e5af74f9da82cbe",
@@ -204,7 +197,7 @@
         "packages/core/src/standalone.ts": "6a701844d6578fb05b4c20dc43536b620f3451c6036f43d859527a150b65a754",
         "packages/core/src/types.ts": "3882a45ca4228b933c611151cb4cbe841fe088ea2841a5ca23d57249b28f27c8",
         "packages/element/README.md": "e56b162c746d539ab5b3bcd74f14e80b6a0ce9ff5227a56cd58bb5032f3cd539",
-        "packages/element/skills/embed-metal-card/SKILL.md": "9353b02b4ea6cac30c4426abfeb0e7866a152aba7fcd5a72de5601595d411943",
+        "packages/element/skills/embed-metal-card/SKILL.md": "bd732b368391ba4433771979c76ac1d10a485de76430e6646b7e4c51a50c5908",
         "packages/element/skills/embed-metal-card/references/attributes.md": "3ef2941769cfa511bf525dee81804bd28e3ab5776c96a2a434868419fac7bd86",
         "packages/element/skills/embed-metal-card/references/serving-and-csp.md": "75f0876a0a9596295965223a339cc6eb3f6c05a8a7aca97c2a60759c231c58bc",
         "packages/element/src/attributes.test.ts": "b355b64edd423f1180e08f14ab95ec92560dd119b81b20fb4c777186ec0d396e",
@@ -215,15 +208,14 @@
         "packages/element/src/standalone.ts": "546e056b32e3473d013e960257cf7f7bfe95a4a1e787052666f13466b527447e",
         "packages/element/vite.standalone.config.ts": "a9fe104bea21327fa38d1cb97ed7676ad851bd8d24a9257dbb076985f821299b",
         "packages/react/README.md": "9643c03677036a1ef6315b4a4bde8c864b1ed541c0e4f68fce3c31b4f0764553",
-        "packages/react/skills/metal-card-react/SKILL.md": "be41291cfcaf95a9e0f318d70792ef4299af4319c29c3aa16c1b85e0d2666036",
+        "packages/react/skills/metal-card-react/SKILL.md": "3d86ec30fdbaa0d13f2a0d5e7fd8251034d63a503e32f9f1bcbe74c35e7bd871",
         "packages/react/src/index.tsx": "a985949224b47db69666e4d3cf6e6030a9443c513110e32fd27b2e494529367a"
       },
-      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "head": "882d223dfc57bb0332f7e541af2357bab3c30fb9",
       "outcome": "updated",
-      "reason": "skill_spec.md gains the batch's history entry and the pool-limit decision; domain_map.yaml and skill_tree.yaml verified accurate: no developer task, failure mode, description or source mapping changed.",
+      "reason": "Rebased onto 0.1.1: the skills' library_version moved to 0.1.1 on main (the Version PR), on top of this branch's already-reviewed guidance updates (engine-stage: when the engine downloads, parts prefetched together, WebGPU stages share a device; metal-card-react: a design object edited in place isn't re-read; stage-api: what setPaused stops). Planning records already carry those entries.",
       "evidence": [
-        "_artifacts/skill_spec.md (Coverage and batch history)",
-        "intent validate: 5 skills passed"
+        "Changed: packages/core/skills/card-design-json/SKILL.md, packages/core/skills/custom-face-shaders-wgsl/SKILL.md, packages/core/skills/engine-stage/SKILL.md, packages/element/skills/embed-metal-card/SKILL.md, packages/react/skills/metal-card-react/SKILL.md at 882d223dfc57bb0332f7e541af2357bab3c30fb9"
       ]
     },
     "source:crates/card3d-engine/shaders/liquid-metal.wgsl": {
