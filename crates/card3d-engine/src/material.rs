@@ -334,20 +334,50 @@ fn mode_layout(mode: &str, s: f64, l: f64) -> ([f32; 2], f32, f32, [f32; 2]) {
     }
 }
 
+/// A linear value's sRGB byte (rounded), as a mip chain's sRGB levels store it.
+fn srgb_byte(c: f32) -> u8 {
+    let v = if c <= 0.0031308 { c * 12.92 } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 };
+    (v * 255.0 + 0.5).clamp(0.0, 255.0) as u8
+}
+
+/// `srgb_byte` without a `powf`, from two tables made once: each byte's least linear value (found by
+/// bisection over the floats in 0..1), and the byte at each 1/4096 step of 0..1. No step holds two
+/// bytes (the curve is steepest at 0, at 0.8 bytes a step), so the byte is the step's, or the next
+/// from its least value on. The same bytes as long as `srgb_byte` never falls as `c` rises (checked
+/// for every float in 0..1.01 with the native and the wasm `powf`).
+fn srgb_byte_lookup(c: f32) -> u8 {
+    static TABLES: std::sync::OnceLock<([f32; 256], [u8; 4097])> = std::sync::OnceLock::new();
+    let (least, steps) = TABLES.get_or_init(|| {
+        let least: [f32; 256] = std::array::from_fn(|k| {
+            let (mut lo, mut hi) = (0u32, 1f32.to_bits());
+            while hi - lo > 1 {
+                let mid = lo + (hi - lo) / 2;
+                if srgb_byte(f32::from_bits(mid)) >= k as u8 {
+                    hi = mid;
+                } else {
+                    lo = mid;
+                }
+            }
+            f32::from_bits(hi)
+        });
+        (least, std::array::from_fn(|i| srgb_byte(i as f32 / 4096.0)))
+    });
+    // NaN and negative values land on step 0, beyond 1 on the last (byte 255).
+    let b = steps[((c * 4096.0) as usize).min(4096)];
+    b + (b < 255 && c >= least[b as usize + 1]) as u8
+}
+
 /// Mip chain of an RGBA8 image (level 0 first), like a GPU's generateMipmap. `srgb`: filter in linear light.
 pub fn mip_chain(data: &[u8], w: u32, h: u32, srgb: bool) -> Vec<(u32, u32, Vec<u8>)> {
-    let to_lin = |b: u8| {
+    // Every byte's linear value, worked out once (a `powf` per tap made sRGB chains several times slower).
+    let to_lin: [f32; 256] = std::array::from_fn(|b| {
         let c = b as f32 / 255.0;
         if c <= 0.04045 {
             c / 12.92
         } else {
             ((c + 0.055) / 1.055).powf(2.4)
         }
-    };
-    let to_srgb = |c: f32| {
-        let v = if c <= 0.0031308 { c * 12.92 } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 };
-        (v * 255.0 + 0.5).clamp(0.0, 255.0) as u8
-    };
+    });
     let mut levels = vec![(w, h, data.to_vec())];
     while levels.last().map(|l| l.0 > 1 || l.1 > 1).unwrap_or(false) {
         let (pw, ph, prev) = levels.last().unwrap();
@@ -358,7 +388,7 @@ pub fn mip_chain(data: &[u8], w: u32, h: u32, srgb: bool) -> Vec<(u32, u32, Vec<
         let fetch = |x: u32, y: u32, c: usize| {
             let b = prev[4 * (y.min(ph - 1) * pw + x.min(pw - 1)) as usize + c];
             if srgb && c < 3 {
-                to_lin(b)
+                to_lin[b as usize]
             } else {
                 b as f32
             }
@@ -373,11 +403,37 @@ pub fn mip_chain(data: &[u8], w: u32, h: u32, srgb: bool) -> Vec<(u32, u32, Vec<
                     let top = fetch(x0, y0, c) * (1.0 - fx) + fetch(x0 + 1, y0, c) * fx;
                     let bottom = fetch(x0, y0 + 1, c) * (1.0 - fx) + fetch(x0 + 1, y0 + 1, c) * fx;
                     let avg = top * (1.0 - fy) + bottom * fy;
-                    out[(4 * (y * nw + x)) as usize + c] = if srgb && c < 3 { to_srgb(avg) } else { (avg + 0.5) as u8 };
+                    out[(4 * (y * nw + x)) as usize + c] = if srgb && c < 3 { srgb_byte_lookup(avg) } else { (avg + 0.5) as u8 };
                 }
             }
         }
         levels.push((nw, nh, out));
     }
     levels
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{srgb_byte, srgb_byte_lookup};
+
+    /// The lookup gives `srgb_byte`'s bytes: around every step (where a difference would show), across
+    /// 0..1.01, and outside it.
+    #[test]
+    fn srgb_lookup_is_exact() {
+        let same = |c: f32| assert_eq!(srgb_byte_lookup(c), srgb_byte(c), "{c:e} ({:#x})", c.to_bits());
+        for k in 1..=255u32 {
+            let (mut lo, mut hi) = (0u32, 1f32.to_bits());
+            while hi - lo > 1 {
+                let mid = lo + (hi - lo) / 2;
+                if (srgb_byte(f32::from_bits(mid)) as u32) < k {
+                    lo = mid;
+                } else {
+                    hi = mid;
+                }
+            }
+            (hi.saturating_sub(512)..hi + 512).for_each(|b| same(f32::from_bits(b)));
+        }
+        (0..1.01f32.to_bits()).step_by(997).for_each(|b| same(f32::from_bits(b)));
+        [-1.0, -0.0, 0.0, 1.0, 1.5, f32::INFINITY, f32::NEG_INFINITY, f32::NAN].into_iter().for_each(same);
+    }
 }
