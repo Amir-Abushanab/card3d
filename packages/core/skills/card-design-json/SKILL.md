@@ -122,7 +122,7 @@ for (const w of warnings) console.warn(`${w.path}: ${w.message}`); // clamped va
 
 ## 5. Share links and files
 
-- Card Studio's **Save & share → Copy share link** gives `https://card-studio.pages.dev/#d=<token>`
+- Card Studio's **Save & share → Copy share link** gives `https://card3d-studio.pages.dev/#d=<token>`
   (gzip + base64url of the design). `decodeDesignToken(linkOrHashOrToken)` returns a validated design;
   `encodeDesignToken(design)` resolves `{ token, stripped }`.
 - Links leave inline uploads out (data-URL artwork and stickers, an uploaded font's file): `stripped`

@@ -10,7 +10,7 @@
  * The engine code runs from source through Vite (SSR for the checks, a dev page for the renders),
  * the renders through Playwright's Chromium (`pnpm --filter card-studio e2e:install` once). Exit code 1
  * when the design has errors. Links: http://localhost:5180/#d=… (`pnpm dev`), plus $CARD_STUDIO_URL
- * (e.g. https://card-studio.pages.dev) when set.
+ * (e.g. https://card3d-studio.pages.dev) when set.
  */
 import { createServer } from "vite";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

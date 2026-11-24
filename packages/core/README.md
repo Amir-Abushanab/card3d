@@ -1,6 +1,6 @@
 # @card3d/core
 
-The engine behind [Card Studio](https://card-studio.pages.dev): 3D metal cards drawn by a Rust engine on
+The engine behind [Card Studio](https://card3d-studio.pages.dev): 3D metal cards drawn by a Rust engine on
 wgpu, shipped as two wasm builds (WebGPU, and WebGL 2 for browsers without it). Brushed, guilloché and
 hammered metals, holo foils, inlaid artwork and stickers, face shaders, lighting presets, scenes, AR and
 print exports, and the design model (recipes, presets, validation, share tokens).

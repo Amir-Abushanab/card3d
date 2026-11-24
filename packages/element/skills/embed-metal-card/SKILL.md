@@ -70,7 +70,7 @@ npm or React) that carries the design. By hand, the base design is the most spec
 or the token) › `src` (URL of a design JSON) › `preset` › the default card.
 
 ```html
-<metal-card share="https://card-studio.pages.dev/#d=H4sIA…"></metal-card>
+<metal-card share="https://card3d-studio.pages.dev/#d=H4sIA…"></metal-card>
 <metal-card src="/cards/ada.card.json"></metal-card>
 <metal-card design='{"recipe":{"material":"silver","color":"#e2c27a"},"cardholderName":"Ada Lovelace"}'></metal-card>
 ```

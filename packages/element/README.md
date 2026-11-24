@@ -1,7 +1,7 @@
 # @card3d/element
 
 `<metal-card>`: a drop-in 3D metal card for any page, plain HTML, Vue, Svelte or anything else. Design
-one in [Card Studio](https://card-studio.pages.dev), then **Export → Embed…** and paste the snippet.
+one in [Card Studio](https://card3d-studio.pages.dev), then **Export → Embed…** and paste the snippet.
 
 ## From a CDN
 

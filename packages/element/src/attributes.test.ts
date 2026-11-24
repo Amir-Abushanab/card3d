@@ -167,7 +167,7 @@ describe("resolveDesign", () => {
     d.recipe.material = "oxide";
     d.cardholderName = "Katherine Johnson";
     const { token } = await encodeDesignToken(d);
-    for (const share of [token, `#d=${token}`, `https://card-studio.pages.dev/#d=${token}`]) {
+    for (const share of [token, `#d=${token}`, `https://card3d-studio.pages.dev/#d=${token}`]) {
       const r = await resolveDesign({ share }, noFetch);
       expect(r.source).toBe("share");
       expect(r.design.recipe.material).toBe("oxide");

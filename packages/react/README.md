@@ -1,7 +1,7 @@
 # @card3d/react
 
 `<MetalCard>`: a 3D metal card for React, a thin wrapper around the [`<metal-card>`](../element) custom
-element. Design one in [Card Studio](https://card-studio.pages.dev), then **Export → Embed… → React**.
+element. Design one in [Card Studio](https://card3d-studio.pages.dev), then **Export → Embed… → React**.
 
 ## Install
 

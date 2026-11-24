@@ -56,7 +56,7 @@ The deploy needs some one-time account setup, below. Until you do it, CI still r
 
 The **`apps/studio`** app is one multi-page Vite build: the studio at `/` and the card marquee showcase at
 `/showcase.html`. `pnpm --filter card-studio build` produces `apps/studio/dist`, deployed to Cloudflare
-Pages as project **`card-studio`**. The build uses only the public assets (procedural card and chip, a
+Pages as project **`card3d-studio`**. The build uses only the public assets (procedural card and chip, a
 generic mark, the self-hosted OFL card fonts emitted as hashed `.woff2` files); a local asset pack and the
 local plugin (`.reference/`, gitignored) are dev-only and never part of it.
 
@@ -70,11 +70,11 @@ One-time:
 4. _(Not needed — the workflow creates the project on its first deploy. Do it by hand only if you prefer.)_ Create it explicitly:
    ```sh
    pnpm dlx wrangler login
-   pnpm dlx wrangler pages project create card-studio --production-branch=main
+   pnpm dlx wrangler pages project create card3d-studio --production-branch=main
    ```
 
 Then **push to `main`** → CI checks, builds, runs the e2e tests and deploys. The live URLs are
-`https://card-studio.pages.dev` (studio) and `https://card-studio.pages.dev/showcase.html` (showcase),
+`https://card3d-studio.pages.dev` (studio) and `https://card3d-studio.pages.dev/showcase.html` (showcase),
 until you add a custom domain (Pages project → _Custom domains_).
 
 ## Describe a finish (feature flag)

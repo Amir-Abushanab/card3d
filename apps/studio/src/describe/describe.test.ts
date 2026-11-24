@@ -51,7 +51,7 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "request-id": "req_test" } });
 
 describe("feature flag", () => {
-  const base: FlagInputs = { env: undefined, search: "", stored: null, dev: false, hostname: "card-studio.pages.dev" };
+  const base: FlagInputs = { env: undefined, search: "", stored: null, dev: false, hostname: "card3d-studio.pages.dev" };
   it("is off by default, in dev and in builds", () => {
     expect(resolveDescribeFlag(base).enabled).toBe(false);
     expect(resolveDescribeFlag({ ...base, dev: true, hostname: "localhost" }).enabled).toBe(false);

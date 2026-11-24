@@ -33,7 +33,7 @@ describe("share tokens", () => {
       token,
       `#d=${token}`,
       `d=${token}`,
-      `https://card-studio.pages.dev/#d=${token}`,
+      `https://card3d-studio.pages.dev/#d=${token}`,
       `https://example.com/studio/?x=1#d=${token}&y=2`,
       `  ${token.slice(0, 10)}\n  ${token.slice(10)}  `,
     ]) {

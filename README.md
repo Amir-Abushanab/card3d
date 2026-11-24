@@ -10,7 +10,7 @@ library. A card is one JSON design, so the same card looks the same everywhere.
 
 Inspired by the 3D cards Ramp showcases on [ramp.design](https://ramp.design).
 
-**[Open the studio](https://card-studio.pages.dev)** · [Packages](#quick-start) · [AI agents](#ai-agents) · [Contributing](#contributing) · [Docs](#docs)
+**[Open the studio](https://card3d-studio.pages.dev)** · [Packages](#quick-start) · [AI agents](#ai-agents) · [Contributing](#contributing) · [Docs](#docs)
 
 ## Features
 
@@ -59,7 +59,7 @@ the CDN, npm or React, with the design in it.
 <script type="module" src="https://cdn.jsdelivr.net/npm/@card3d/element@0.1/dist/standalone/metal-card.js"></script>
 
 <metal-card preset="brass-orbit-guilloche" name="Ada Lovelace" auto-rotate style="width: 480px"></metal-card>
-<metal-card share="https://card-studio.pages.dev/#d=H4sIA…"></metal-card>   <!-- a studio share link -->
+<metal-card share="https://card3d-studio.pages.dev/#d=H4sIA…"></metal-card>   <!-- a studio share link -->
 <metal-card preset="pearl-guilloche" environment="softbox" floor ar></metal-card>  <!-- HDRI, floor, View in AR -->
 ```
 
