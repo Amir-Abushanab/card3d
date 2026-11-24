@@ -185,7 +185,7 @@ GitHub (repository → Settings):
    permissions; the default can stay read-only.
 2. **Branch protection** (or a ruleset) on `main`: require pull requests and these status checks:
    `Rust (fmt, deny, clippy, tests, validator)`, `Web builds (wasm)`, `TypeScript (check, build, pack)`,
-   `E2E (Studio, Playwright)` and **`Validate intent skills`** (Check Skills). Add
+   the four `E2E (Studio, Playwright n/4)` shards and **`Validate intent skills`** (Check Skills). Add
    `WebGPU + WebGL on SwiftShader (fallbacks, harness subset)` once it has proven stable. Don't require
    `Changeset` (it only warns). If a ruleset restricts tag creation, let GitHub Actions create `@card3d/*`
    tags.
