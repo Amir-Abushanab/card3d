@@ -678,7 +678,7 @@ pub fn errors_json(errors: &[LayerError]) -> String {
 /// What main calls each frame.
 trait Frame {
     fn update(&mut self, dt: f64, model: Mat4);
-    fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue, model: Mat4, cam: &crate::renderer::Camera);
+    fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue);
     fn set_pointer(&mut self, ndc: [f64; 2]);
     fn wheel(&mut self, delta: f64);
 }
@@ -1071,10 +1071,9 @@ impl FaceLayers {
         }
     }
 
-    /// Before a frame: the overlays' eye (the camera in each face's space), every uniform, and the
-    /// dirty skins re-rendered.
-    pub fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue, model: Mat4, cam: &crate::renderer::Camera) {
-        self.state.prepare(r, device, queue, model, cam);
+    /// Before a frame: the live layers' uniforms, and the dirty skins re-rendered.
+    pub fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue) {
+        self.state.prepare(r, device, queue);
     }
 
     /// The page's pointer (normalised device coordinates), for the runtimes that follow it.
@@ -1127,16 +1126,14 @@ impl Frame for State {
         }
     }
 
-    fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue, model: Mat4, cam: &crate::renderer::Camera) {
+    fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue) {
         // The runtimes' surfaces first: the skins and overlays sample them.
         for rt in self.layers.iter_mut().filter_map(|l| l.runtime.as_mut()) {
             rt.prepare(device, queue);
         }
-        for l in &mut self.layers {
-            if let Some((_, t)) = l.overlay {
-                let eye = (model * t).inverse().transform_point3(cam.eye32());
-                l.data.eye = [eye.x, eye.y, eye.z, 0.0];
-            }
+        // A layer's own values change only while it is live (its clock and tilt; written when it was
+        // built): the renderer writes an overlay's model-view matrix and eye for each view it draws.
+        for l in self.layers.iter().filter(|l| l.live) {
             queue.write_buffer(&l.uniform, 0, bytemuck::bytes_of(&l.data));
         }
         for side in 0..2 {

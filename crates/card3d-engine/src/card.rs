@@ -606,7 +606,7 @@ impl CardRenderer {
     /// Before drawing: the face shaders' uniforms and skins, the add-ons' per-frame state.
     pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, model: Mat4, cam: &crate::renderer::Camera) {
         if let Some(f) = self.faces.as_mut() {
-            f.prepare(&self.renderer, device, queue, model, cam);
+            f.prepare(&self.renderer, device, queue);
         }
         if let Some(s) = self.shine.as_mut() {
             s.prepare(&mut self.renderer, queue, model, cam);

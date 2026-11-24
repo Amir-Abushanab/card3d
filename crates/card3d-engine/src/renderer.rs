@@ -395,7 +395,7 @@ pub struct Item {
 }
 
 pub(crate) struct GpuItem {
-    pub(crate) buffer: wgpu::Buffer,
+    /// Bound at the item's slot of the renderer's uniform buffer (`Renderer::uniforms`).
     bind_group: wgpu::BindGroup,
     pub(crate) uniform: MaterialUniform,
     key: PipelineKey,
@@ -436,7 +436,7 @@ impl Core {
         });
         let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("draw"),
-            entries: &[uniform_entry(0), texture_entry(1), texture_entry(2), texture_entry(3), texture_entry(4), sampler_entry(5), sampler_entry(6)],
+            entries: &[slot_entry(0), texture_entry(1), texture_entry(2), texture_entry(3), texture_entry(4), sampler_entry(5), sampler_entry(6)],
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
@@ -678,6 +678,14 @@ pub struct Renderer {
     pub(crate) samplers: HashMap<(Wrap, u16), wgpu::Sampler>,
     pub items: Vec<Item>,
     pub(crate) gpu_items: Vec<Option<GpuItem>>,
+    /// Every item's uniforms, one slot of `stride` bytes per item (by index), written at once each
+    /// frame (`write_items`): items bind their slot at a dynamic offset. `None` until the first item
+    /// is prepared; remade larger when items are added.
+    uniforms: Option<wgpu::Buffer>,
+    /// A slot's size: the uniforms' size rounded up to the device's offset alignment.
+    stride: u64,
+    /// What `write_items` writes into `uniforms`.
+    staging: Vec<u8>,
     targets: Option<(u32, u32, wgpu::TextureView, wgpu::TextureView)>,
     /// The lights, exposure and environment intensity / turn (a lighting preset's values).
     pub lighting: Lighting,
@@ -897,6 +905,10 @@ impl Renderer {
             samplers,
             items: Vec::new(),
             gpu_items: Vec::new(),
+            uniforms: None,
+            stride: (size_of::<MaterialUniform>().max(size_of::<HoloUniform>()) as u64)
+                .next_multiple_of(device.limits().min_uniform_buffer_offset_alignment as u64),
+            staging: Vec::new(),
             targets: None,
             lighting: Lighting::default(),
             holo: Vec::new(),
@@ -1208,6 +1220,7 @@ impl Renderer {
     /// targets' when the card draws into them (a glass card's buffers, a scene floor's reflection).
     pub(crate) fn warm(&mut self, device: &wgpu::Device) {
         let buffers = self.glass_passes.is_some() || self.offscreen;
+        self.slots(device);
         for i in 0..self.items.len() {
             if self.custom[i].is_some() {
                 continue;
@@ -1226,6 +1239,39 @@ impl Renderer {
         }
     }
 
+    /// Makes `uniforms` hold a slot for every item; a new buffer drops the bind groups on the old.
+    fn slots(&mut self, device: &wgpu::Device) {
+        let size = self.items.len().max(1) as u64 * self.stride;
+        if self.uniforms.as_ref().is_some_and(|b| b.size() >= size) {
+            return;
+        }
+        self.uniforms = Some(device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("items"),
+            size,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        }));
+        self.gpu_items.clear();
+    }
+
+    /// A slot of `uniforms` as a binding, `size` bytes at the item's dynamic offset.
+    fn slot(&self, size: usize) -> wgpu::BindingResource<'_> {
+        let buffer = self.uniforms.as_ref().expect("slots made before items are prepared");
+        wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer, offset: 0, size: wgpu::BufferSize::new(size as u64) })
+    }
+
+    /// Item `i`'s dynamic offset into `uniforms`.
+    fn offset(&self, i: usize) -> u32 {
+        (i as u64 * self.stride) as u32
+    }
+
+    /// Writes item `i`'s material uniforms alone (a glass pass turning its faces).
+    pub(crate) fn write_item(&self, queue: &wgpu::Queue, i: usize) {
+        if let (Some(b), Some(g)) = (&self.uniforms, self.gpu_items.get(i).and_then(|g| g.as_ref())) {
+            queue.write_buffer(b, i as u64 * self.stride, bytemuck::bytes_of(&g.uniform));
+        }
+    }
+
     fn prepare(&mut self, device: &wgpu::Device, i: usize) {
         if self.gpu_items.len() <= i {
             self.gpu_items.resize_with(i + 1, || None);
@@ -1234,16 +1280,10 @@ impl Renderer {
             return;
         }
         if self.holo[i].is_some() {
-            let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("holo"),
-                size: size_of::<HoloUniform>() as u64,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
                 layout: &self.holo_gpu.as_ref().expect("holo items come from add_holo").draw_layout,
-                entries: &[wgpu::BindGroupEntry { binding: 0, resource: buffer.as_entire_binding() }],
+                entries: &[wgpu::BindGroupEntry { binding: 0, resource: self.slot(size_of::<HoloUniform>()) }],
             });
             let key = PipelineKey {
                 holo: true,
@@ -1256,7 +1296,7 @@ impl Renderer {
                 glass: false,
                 buffer: false,
             };
-            self.gpu_items[i] = Some(GpuItem { buffer, bind_group, uniform: bytemuck::Zeroable::zeroed(), key });
+            self.gpu_items[i] = Some(GpuItem { bind_group, uniform: bytemuck::Zeroable::zeroed(), key });
             return;
         }
         let (surface, colour) = {
@@ -1269,18 +1309,12 @@ impl Renderer {
         self.sampler(device, colour.0, colour.1);
         let m = &self.items[i].material;
         let tex = |t: Option<TextureId>| &self.textures[t.unwrap_or(self.white).0];
-        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size: size_of::<MaterialUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
         let sampler = |k: (Wrap, u16)| &self.samplers[&k];
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &self.core.draw_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: buffer.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 0, resource: self.slot(size_of::<MaterialUniform>()) },
                 wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&tex(m.normal_map).view) },
                 wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&tex(m.roughness_map).view) },
                 wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&tex(m.map).view) },
@@ -1317,7 +1351,7 @@ impl Renderer {
             glass: m.glass.is_some(),
             buffer: false,
         };
-        self.gpu_items[i] = Some(GpuItem { buffer, bind_group, uniform, key });
+        self.gpu_items[i] = Some(GpuItem { bind_group, uniform, key });
     }
 
     /// Renders the scene with the card turned by Euler XYZ angles (radians) into `target`, the camera
@@ -1380,11 +1414,15 @@ impl Renderer {
         }
     }
 
-    /// Writes every visible item's uniforms for `view` (the card at `slot`) and returns them in three's
-    /// draw order: opaque by render order (then insertion), transparent by render order then farthest
-    /// first.
-    pub(crate) fn write_items(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: Mat4, slot: Mat4) -> Vec<usize> {
+    /// Writes every visible item's uniforms for `view` (the card at `slot`; `write` false: only orders
+    /// them, for a frame whose passes write their own first) and returns them in three's draw order:
+    /// opaque by render order (then insertion), transparent by render order then farthest first. The
+    /// card's own items' go into `uniforms` in one write.
+    pub(crate) fn write_items(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: Mat4, slot: Mat4, write: bool) -> Vec<usize> {
         let mut order: Vec<(bool, f32, f32, usize)> = Vec::new();
+        self.slots(device);
+        let stride = self.stride as usize;
+        let mut end = 0;
         for i in 0..self.items.len() {
             if !self.items[i].visible {
                 continue;
@@ -1392,7 +1430,9 @@ impl Renderer {
             if let Some(c) = &self.custom[i] {
                 let it = &self.items[i];
                 let mv = if c.world { view * it.transform } else { view * slot * it.transform };
-                queue.write_buffer(&c.uniform, 0, bytemuck::bytes_of(&mat(mv)));
+                if write {
+                    queue.write_buffer(&c.uniform, 0, bytemuck::bytes_of(&mat(mv)));
+                }
                 let z = (mv * self.meshes[it.mesh.0].centre.extend(1.0)).z;
                 order.push((it.material.transparent, it.render_order, if it.material.transparent { z } else { 0.0 }, i));
                 continue;
@@ -1400,7 +1440,16 @@ impl Renderer {
             self.prepare(device, i);
             let it = &self.items[i];
             let mv = view * slot * it.transform;
+            let z = (mv * self.meshes[it.mesh.0].centre.extend(1.0)).z;
+            order.push((it.material.transparent, it.render_order, if it.material.transparent { z } else { 0.0 }, i));
+            if !write {
+                continue;
+            }
             let g = self.gpu_items[i].as_mut().unwrap();
+            if self.staging.len() < (i + 1) * stride {
+                self.staging.resize((i + 1) * stride, 0);
+            }
+            let at = &mut self.staging[i * stride..];
             if let Some(h) = self.holo[i] {
                 let v = h.values;
                 let l = crate::holo::light_direction();
@@ -1411,7 +1460,7 @@ impl Renderer {
                     params3: [h.edge_side, 0.0, 0.0, 0.0],
                     light: [l[0], l[1], l[2], 0.0],
                 };
-                queue.write_buffer(&g.buffer, 0, bytemuck::bytes_of(&u));
+                at[..size_of::<HoloUniform>()].copy_from_slice(bytemuck::bytes_of(&u));
             } else {
                 let m = &it.material;
                 // Opacity may change from frame to frame (an effect fading a layer), and a sticker's
@@ -1426,10 +1475,12 @@ impl Renderer {
                 }
                 g.uniform.model_view = mat(mv);
                 g.uniform.normal_matrix = mat(Mat4::from_mat3(Mat3::from_mat4(mv).inverse().transpose()));
-                queue.write_buffer(&g.buffer, 0, bytemuck::bytes_of(&g.uniform));
+                at[..size_of::<MaterialUniform>()].copy_from_slice(bytemuck::bytes_of(&g.uniform));
             }
-            let z = (mv * self.meshes[it.mesh.0].centre.extend(1.0)).z;
-            order.push((it.material.transparent, it.render_order, if it.material.transparent { z } else { 0.0 }, i));
+            end = (i + 1) * stride;
+        }
+        if end > 0 {
+            queue.write_buffer(self.uniforms.as_ref().unwrap(), 0, &self.staging[..end]);
         }
         order.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)).then(a.2.total_cmp(&b.2)).then(a.3.cmp(&b.3)));
         order.iter().map(|o| o.3).collect()
@@ -1462,7 +1513,7 @@ impl Renderer {
         let view = cam.view32();
         let frame = self.frame_uniform(view, proj, model, true);
         queue.write_buffer(&self.frame_buffer, 0, bytemuck::bytes_of(&frame));
-        let order = self.write_items(device, queue, view, model);
+        let order = self.write_items(device, queue, view, model, true);
         for e in &self.eyes {
             e.write(queue, model, cam);
         }
@@ -1542,16 +1593,20 @@ impl Renderer {
             queue.write_buffer(&h.frame_buffer, 0, bytemuck::bytes_of(&holo_frame));
         }
         let slot = model;
-        let order = self.write_items(device, queue, view, slot);
-        for e in &self.eyes {
-            e.write(queue, model, cam);
+        // A scene's passes draw other views first and write the items' uniforms for each: the canvas's
+        // follow them.
+        let order = self.write_items(device, queue, view, slot, passes.is_none());
+        if passes.is_none() {
+            for e in &self.eyes {
+                e.write(queue, model, cam);
+            }
         }
         let glass_item = order.iter().copied().find(|&i| self.items[i].material.glass.is_some());
         // A scene's passes: its reflection and contact shadow (for a glass card, its reflection without
         // the glass; the glass's buffers come next).
         if let Some(p) = passes.as_mut() {
             p.run(self, device, queue, &pass_frame, PassStage::First);
-            self.write_items(device, queue, view, slot);
+            self.write_items(device, queue, view, slot, true);
             for e in &self.eyes {
                 e.write(queue, model, cam);
             }
@@ -1667,7 +1722,7 @@ impl Renderer {
                 };
                 pass.set_bind_group(0, frame_group, &[]);
                 pass.set_pipeline(pipeline);
-                pass.set_bind_group(1, &g.bind_group, &[]);
+                pass.set_bind_group(1, &g.bind_group, &[self.offset(i)]);
                 if key.glass {
                     let t = self.glass_gpu.as_ref().and_then(|g| g.targets.as_ref()).expect("glass buffers");
                     let back = glass.is_some_and(|(gi, b)| gi == i && b == GlassBuffer::Back);
@@ -1730,6 +1785,16 @@ pub(crate) fn uniform_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
+/// An item's uniforms: its slot of the renderer's buffer, at a dynamic offset (`Renderer::uniforms`).
+fn slot_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+        ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: None },
+        count: None,
+    }
+}
+
 pub(crate) fn texture_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding,
@@ -1757,7 +1822,7 @@ impl HoloGpu {
         let shader =
             device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("holo"), source: wgpu::ShaderSource::Wgsl(wgsl!("holo.wgsl").into()) });
         let frame_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("holo frame"), entries: &[uniform_entry(0)] });
-        let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("holo draw"), entries: &[uniform_entry(0)] });
+        let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("holo draw"), entries: &[slot_entry(0)] });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("holo"),
             bind_group_layouts: &[Some(&frame_layout), Some(&draw_layout)],
