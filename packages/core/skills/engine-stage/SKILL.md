@@ -34,7 +34,8 @@ sources:
 The engine is Rust on wgpu, shipped as two wasm builds: WebGPU, and WebGL 2 for browsers without it.
 A page downloads one build (about 166 KB gzipped for the WebGPU main module, 793 KB for WebGL 2) and
 each optional part of a card (holo, stickers, shapes, shaders, effects, scenes, AR, print) the first
-time a design uses it. Read card-design-json for the designs it draws. If a drop-in card is enough,
+time a design uses it. The download starts when the first stage is created, while the design's fonts
+and images load: create the stage as early as the page knows it will show a card. Read card-design-json for the designs it draws. If a drop-in card is enough,
 `<metal-card>` (embed-metal-card) does all of this for you.
 
 ## Setup

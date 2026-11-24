@@ -6,7 +6,7 @@
  * property (an object never round-trips through JSON in the DOM). SSR renders the bare element; the
  * card starts on the client once it scrolls into view.
  */
-import { createElement, forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { createElement, forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import type { CSSProperties, ForwardedRef, ReactElement } from "react";
 import "@card3d/element";
 import type { CardDesign, Interaction, MetalCardElement, MetalCardReadyDetail } from "@card3d/element";
@@ -84,7 +84,8 @@ function MetalCardImpl(props: MetalCardProps, ref: ForwardedRef<MetalCardElement
 
   // Object designs go through the property; string designs through the attribute.
   const objectDesign = props.design && typeof props.design === "object" ? props.design : null;
-  const designKey = objectDesign ? JSON.stringify(objectDesign) : "";
+  // Serialised once per design object: a parent re-rendering with the same object costs nothing.
+  const designKey = useMemo(() => (objectDesign ? JSON.stringify(objectDesign) : ""), [objectDesign]);
   // Keyed on the serialised design: a new object with the same content doesn't rebuild the card.
   // oxlint-disable-next-line react/exhaustive-effect-dependencies -- designKey stands for objectDesign
   useEffect(() => {
