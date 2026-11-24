@@ -3,9 +3,9 @@
   "baseline": "0135a412774ef82fd86609ff04d67241cf540c4e",
   "items": {
     "skill:packages/core/skills/card-design-json/SKILL.md": {
-      "fingerprint": "d1aae5806b11713e6f96ba1fdf87523757b4696d9772c54309dccbe3aa6c2463",
+      "fingerprint": "e60a55bd1d87414ab20b3bd9709882da9effde908f82bf22cec1ceacfe1e6598",
       "snapshot": {
-        "packages/core/skills/card-design-json/SKILL.md": "c2ba812c7a16a294a9389fc31b61b50c48f37d6b0160c196956d0b4a349e105a",
+        "packages/core/skills/card-design-json/SKILL.md": "5c5176e7f34fc500a518b61d3c7e193c6e2a20f6bf87a734267241ea85234659",
         "packages/core/skills/card-design-json/references/design-fields.md": "acb93f9ac2df0062894df5e416b00c715ee312b7023374eedb4258eec5cba254",
         "packages/core/skills/card-design-json/references/examples.md": "e43cc626d6d61820693e5bfe51bc8cca8966af89b32cbf4b61adc5deab75f8cd",
         "packages/core/skills/card-design-json/references/presets.md": "78240aea16d12efdc9ad51f37ff03116867551aff9d90de1d6ed66a523124dea",
@@ -28,19 +28,19 @@
         "packages/core/src/recipe/defaults.ts": "8f1f06bc4b92ed3d934fca7d1ac24be9d20dd6c3b0243a658ff666d83cd2e8c4",
         "packages/core/src/types.ts": "3882a45ca4228b933c611151cb4cbe841fe088ea2841a5ca23d57249b28f27c8"
       },
-      "head": "bbd2610edbc1b6b107270aacc6e60ddb17e8ec06",
-      "outcome": "updated",
-      "reason": "The studio's public URL moved from card-studio.pages.dev (another project's site) to card3d-studio.pages.dev. The skills, READMEs and tests that quote a share link now use the new host; share tokens and parsing are unchanged.",
+      "head": "2c7037a31dcbc38455c35082490ed3e661cbe9c2",
+      "outcome": "no-change",
+      "reason": "metadata.library_version set (packages/core/skills → 0.1.1, packages/element/skills → 0.1.1, packages/react/skills → 0.1.1) by scripts/skill-versions.mjs after changeset version. No source or guidance change was pending review before this edit, so the reviewed guidance stands for this version; the version line is the only change.",
       "evidence": [
-        "Changed: packages/core/skills/card-design-json/SKILL.md, packages/core/src/design/share.test.ts at bbd2610edbc1b6b107270aacc6e60ddb17e8ec06"
+        "Changed: packages/core/skills/card-design-json/SKILL.md at 2c7037a31dcbc38455c35082490ed3e661cbe9c2"
       ]
     },
     "skill:packages/core/skills/custom-face-shaders-wgsl/SKILL.md": {
-      "fingerprint": "87f35e2befa31773e63c2353a785eaf11c1ab7e050be4f21c7eec411f207f615",
+      "fingerprint": "6612e0dd5acd5d578873841a53d53f83a3288861e34e671eea932b628fd8df59",
       "snapshot": {
         "crates/card3d-engine/shaders/face/prelude.wgsl": "63c27f150678f7e40847a7ccaaf1b7eeeafba44dc60c91425bb2759a6c3f20fb",
         "crates/card3d-engine/src/face_custom.rs": "ce8eee2c04f4f92c3b788981a34f8c9431a116c45f127c51c89f9ac24e5cd270",
-        "packages/core/skills/custom-face-shaders-wgsl/SKILL.md": "434babef8aef75fae06a3b551d2cfd1d65959ff796ab1e0bcb92a9f10dad873d",
+        "packages/core/skills/custom-face-shaders-wgsl/SKILL.md": "d9135cbc98df0829b26f10ac5e61b8be7a16364047ee62174e1370a280517dab",
         "packages/core/skills/custom-face-shaders-wgsl/references/prelude.md": "e964ab52a19989592a979b8721e23df3e372e287c58afd5bac6040a2af773b64",
         "packages/core/src/design/sanitize.ts": "c455f35cd1ffa0b259e7586be7476ca7fdc344b70dd6ddb678443a4de718b70e",
         "packages/core/src/shaders/custom-parse.ts": "a9d6cb66fd709661ed525be965a17f3aaafa2adb0505da5d0f33a1e12a08b709",
@@ -58,18 +58,18 @@
         "packages/core/src/shaders/types.ts": "7242a3897a85c9b6e9b632cb543db276be18b580e70faabb56a88773d74121a5",
         "packages/core/src/shaders/wgsl-examples.ts": "c47ce7dfda1d1dada54ec1eb49694ceccee9a66875c53ca7f348ebe0fd61f40b"
       },
-      "head": "0135a412774ef82fd86609ff04d67241cf540c4e",
-      "outcome": "updated",
-      "reason": "Initial skill batch 1 (2026-11-20): card-design-json, custom-face-shaders-wgsl, engine-stage, embed-metal-card and metal-card-react, and the _artifacts planning records, authored from the @card3d/* sources at this commit (after the 2026-11-23 removal of the one-off cards and front effects: skill_spec.md, Coverage and batch history); generated references from designSpaceSections() via scripts/skill-references.mjs. Checks: intent validate passes (5 skills, TS fences typechecked), skill-references --check current, pnpm pack:check ships every skill file, intent list in a scratch pnpm project shows the transitive skills. Not run: fresh-consumer task checks (skill_spec.md, Remaining work).",
+      "head": "2c7037a31dcbc38455c35082490ed3e661cbe9c2",
+      "outcome": "no-change",
+      "reason": "metadata.library_version set (packages/core/skills → 0.1.1, packages/element/skills → 0.1.1, packages/react/skills → 0.1.1) by scripts/skill-versions.mjs after changeset version. No source or guidance change was pending review before this edit, so the reviewed guidance stands for this version; the version line is the only change.",
       "evidence": [
-        "No changed files at 0135a412774ef82fd86609ff04d67241cf540c4e"
+        "Changed: packages/core/skills/custom-face-shaders-wgsl/SKILL.md at 2c7037a31dcbc38455c35082490ed3e661cbe9c2"
       ]
     },
     "skill:packages/core/skills/engine-stage/SKILL.md": {
-      "fingerprint": "7cc9a97bca4aa0451e378ae930888ddb3f35e96098040b6dc16003ec81f7de33",
+      "fingerprint": "a1a76a8a98e56bf41ed04bed74afaabe36f11177c4531b2d52c96265413d4859",
       "snapshot": {
         "packages/core/README.md": "891afc9411b3584003609a2be25148d433202d7906871f921dea2344d87eecec",
-        "packages/core/skills/engine-stage/SKILL.md": "c5e8a28fc7e1a37a8764182db4ffe8ed22cce745d1710e82486c1ff5b685de87",
+        "packages/core/skills/engine-stage/SKILL.md": "9a22ece2a33eed344de24d7f0e61dbe894eae4cdd04090cf791531f7b44b8a24",
         "packages/core/skills/engine-stage/references/exports.md": "951a050e8a701747359c56c0a0ff93612ef2a77dd5275bd8c847ff83a675fcb1",
         "packages/core/skills/engine-stage/references/stage-api.md": "8f533394dc3108195b51965ef1d23be950084ca319fbf257ee0837e715b474e6",
         "packages/core/src/ar/ar.test.ts": "de91bb2a74719bd3797ac1f0261eab5d1344216ff50e8d395e5af74f9da82cbe",
@@ -88,18 +88,18 @@
         "packages/core/src/scene/camera-paths.ts": "ace251438f75194855ba955d14538a258b59b86fa5f43fbe4fe55b09012adc72",
         "packages/core/src/standalone.ts": "6a701844d6578fb05b4c20dc43536b620f3451c6036f43d859527a150b65a754"
       },
-      "head": "bbd2610edbc1b6b107270aacc6e60ddb17e8ec06",
-      "outcome": "updated",
-      "reason": "The studio's public URL moved from card-studio.pages.dev (another project's site) to card3d-studio.pages.dev. The skills, READMEs and tests that quote a share link now use the new host; share tokens and parsing are unchanged.",
+      "head": "2c7037a31dcbc38455c35082490ed3e661cbe9c2",
+      "outcome": "no-change",
+      "reason": "metadata.library_version set (packages/core/skills → 0.1.1, packages/element/skills → 0.1.1, packages/react/skills → 0.1.1) by scripts/skill-versions.mjs after changeset version. No source or guidance change was pending review before this edit, so the reviewed guidance stands for this version; the version line is the only change.",
       "evidence": [
-        "Changed: packages/core/README.md at bbd2610edbc1b6b107270aacc6e60ddb17e8ec06"
+        "Changed: packages/core/skills/engine-stage/SKILL.md at 2c7037a31dcbc38455c35082490ed3e661cbe9c2"
       ]
     },
     "skill:packages/element/skills/embed-metal-card/SKILL.md": {
-      "fingerprint": "3d28f32b2d002b832250b21216182b6551f92d16ed41983f39cd1463813ce994",
+      "fingerprint": "3b9e30b196665e820c72124856ee70a337cda574897fd2f7cbceac4f3b56b34e",
       "snapshot": {
         "packages/element/README.md": "e56b162c746d539ab5b3bcd74f14e80b6a0ce9ff5227a56cd58bb5032f3cd539",
-        "packages/element/skills/embed-metal-card/SKILL.md": "9353b02b4ea6cac30c4426abfeb0e7866a152aba7fcd5a72de5601595d411943",
+        "packages/element/skills/embed-metal-card/SKILL.md": "bd732b368391ba4433771979c76ac1d10a485de76430e6646b7e4c51a50c5908",
         "packages/element/skills/embed-metal-card/references/attributes.md": "3ef2941769cfa511bf525dee81804bd28e3ab5776c96a2a434868419fac7bd86",
         "packages/element/skills/embed-metal-card/references/serving-and-csp.md": "75f0876a0a9596295965223a339cc6eb3f6c05a8a7aca97c2a60759c231c58bc",
         "packages/element/src/attributes.test.ts": "b355b64edd423f1180e08f14ab95ec92560dd119b81b20fb4c777186ec0d396e",
@@ -110,29 +110,29 @@
         "packages/element/src/standalone.ts": "546e056b32e3473d013e960257cf7f7bfe95a4a1e787052666f13466b527447e",
         "packages/element/vite.standalone.config.ts": "a9fe104bea21327fa38d1cb97ed7676ad851bd8d24a9257dbb076985f821299b"
       },
-      "head": "bbd2610edbc1b6b107270aacc6e60ddb17e8ec06",
-      "outcome": "updated",
-      "reason": "The studio's public URL moved from card-studio.pages.dev (another project's site) to card3d-studio.pages.dev. The skills, READMEs and tests that quote a share link now use the new host; share tokens and parsing are unchanged.",
+      "head": "2c7037a31dcbc38455c35082490ed3e661cbe9c2",
+      "outcome": "no-change",
+      "reason": "metadata.library_version set (packages/core/skills → 0.1.1, packages/element/skills → 0.1.1, packages/react/skills → 0.1.1) by scripts/skill-versions.mjs after changeset version. No source or guidance change was pending review before this edit, so the reviewed guidance stands for this version; the version line is the only change.",
       "evidence": [
-        "Changed: packages/element/README.md, packages/element/skills/embed-metal-card/SKILL.md, packages/element/src/attributes.test.ts at bbd2610edbc1b6b107270aacc6e60ddb17e8ec06"
+        "Changed: packages/element/skills/embed-metal-card/SKILL.md at 2c7037a31dcbc38455c35082490ed3e661cbe9c2"
       ]
     },
     "skill:packages/react/skills/metal-card-react/SKILL.md": {
-      "fingerprint": "025118c832813f637fa4accdf180522ce5376b4af5892477861b9d8b6b51ff34",
+      "fingerprint": "599dccf7a0a817e61cf6cf7fd3cd057485fe3395bd2be55e12bd2544eb97a445",
       "snapshot": {
         "packages/react/README.md": "9643c03677036a1ef6315b4a4bde8c864b1ed541c0e4f68fce3c31b4f0764553",
-        "packages/react/skills/metal-card-react/SKILL.md": "49068227ed4d8583873bf86b33d8deee8c04b8b7db0d1f0f0970061b5a70273e",
+        "packages/react/skills/metal-card-react/SKILL.md": "a4719f33372b0b691dbe8c93b48742c452586288f861869919e21e00e7064dca",
         "packages/react/src/index.tsx": "893632751ea4765bd9b8f43a92146fc9d1fbeb60c2a25a2d493a6909930d7f7b"
       },
-      "head": "bbd2610edbc1b6b107270aacc6e60ddb17e8ec06",
-      "outcome": "updated",
-      "reason": "The studio's public URL moved from card-studio.pages.dev (another project's site) to card3d-studio.pages.dev. The skills, READMEs and tests that quote a share link now use the new host; share tokens and parsing are unchanged.",
+      "head": "2c7037a31dcbc38455c35082490ed3e661cbe9c2",
+      "outcome": "no-change",
+      "reason": "metadata.library_version set (packages/core/skills → 0.1.1, packages/element/skills → 0.1.1, packages/react/skills → 0.1.1) by scripts/skill-versions.mjs after changeset version. No source or guidance change was pending review before this edit, so the reviewed guidance stands for this version; the version line is the only change.",
       "evidence": [
-        "Changed: packages/react/README.md at bbd2610edbc1b6b107270aacc6e60ddb17e8ec06"
+        "Changed: packages/react/skills/metal-card-react/SKILL.md at 2c7037a31dcbc38455c35082490ed3e661cbe9c2"
       ]
     },
     "planning:_artifacts": {
-      "fingerprint": "4833e9faa9f9637d75a4c066618dcffc39af6b5912f2c39c644bfd5d79b0a74e",
+      "fingerprint": "1ff56cbef25d7521493038bc6242c7705dee778921f23a52e2e5312438a7cb12",
       "snapshot": {
         "_artifacts/domain_map.yaml": "24e71bddb27d9062281edc272ea031a11b327e1b93a56b6d19fb5778a19900e4",
         "_artifacts/skill_spec.md": "3891d7ae516a0f091e391935eb7048b7c748db33047bcf1759fa4db2defe84c5",
@@ -140,14 +140,14 @@
         "crates/card3d-engine/shaders/face/prelude.wgsl": "63c27f150678f7e40847a7ccaaf1b7eeeafba44dc60c91425bb2759a6c3f20fb",
         "crates/card3d-engine/src/face_custom.rs": "ce8eee2c04f4f92c3b788981a34f8c9431a116c45f127c51c89f9ac24e5cd270",
         "packages/core/README.md": "891afc9411b3584003609a2be25148d433202d7906871f921dea2344d87eecec",
-        "packages/core/skills/card-design-json/SKILL.md": "c2ba812c7a16a294a9389fc31b61b50c48f37d6b0160c196956d0b4a349e105a",
+        "packages/core/skills/card-design-json/SKILL.md": "5c5176e7f34fc500a518b61d3c7e193c6e2a20f6bf87a734267241ea85234659",
         "packages/core/skills/card-design-json/references/design-fields.md": "acb93f9ac2df0062894df5e416b00c715ee312b7023374eedb4258eec5cba254",
         "packages/core/skills/card-design-json/references/examples.md": "e43cc626d6d61820693e5bfe51bc8cca8966af89b32cbf4b61adc5deab75f8cd",
         "packages/core/skills/card-design-json/references/presets.md": "78240aea16d12efdc9ad51f37ff03116867551aff9d90de1d6ed66a523124dea",
         "packages/core/skills/card-design-json/references/shaders-and-effects.md": "cdb0d669c7f509e93304e935456dca20e82c0cdb5fb9015ed51fddff73c140cb",
-        "packages/core/skills/custom-face-shaders-wgsl/SKILL.md": "434babef8aef75fae06a3b551d2cfd1d65959ff796ab1e0bcb92a9f10dad873d",
+        "packages/core/skills/custom-face-shaders-wgsl/SKILL.md": "d9135cbc98df0829b26f10ac5e61b8be7a16364047ee62174e1370a280517dab",
         "packages/core/skills/custom-face-shaders-wgsl/references/prelude.md": "e964ab52a19989592a979b8721e23df3e372e287c58afd5bac6040a2af773b64",
-        "packages/core/skills/engine-stage/SKILL.md": "c5e8a28fc7e1a37a8764182db4ffe8ed22cce745d1710e82486c1ff5b685de87",
+        "packages/core/skills/engine-stage/SKILL.md": "9a22ece2a33eed344de24d7f0e61dbe894eae4cdd04090cf791531f7b44b8a24",
         "packages/core/skills/engine-stage/references/exports.md": "951a050e8a701747359c56c0a0ff93612ef2a77dd5275bd8c847ff83a675fcb1",
         "packages/core/skills/engine-stage/references/stage-api.md": "8f533394dc3108195b51965ef1d23be950084ca319fbf257ee0837e715b474e6",
         "packages/core/src/ar/ar.test.ts": "de91bb2a74719bd3797ac1f0261eab5d1344216ff50e8d395e5af74f9da82cbe",
@@ -197,7 +197,7 @@
         "packages/core/src/standalone.ts": "6a701844d6578fb05b4c20dc43536b620f3451c6036f43d859527a150b65a754",
         "packages/core/src/types.ts": "3882a45ca4228b933c611151cb4cbe841fe088ea2841a5ca23d57249b28f27c8",
         "packages/element/README.md": "e56b162c746d539ab5b3bcd74f14e80b6a0ce9ff5227a56cd58bb5032f3cd539",
-        "packages/element/skills/embed-metal-card/SKILL.md": "9353b02b4ea6cac30c4426abfeb0e7866a152aba7fcd5a72de5601595d411943",
+        "packages/element/skills/embed-metal-card/SKILL.md": "bd732b368391ba4433771979c76ac1d10a485de76430e6646b7e4c51a50c5908",
         "packages/element/skills/embed-metal-card/references/attributes.md": "3ef2941769cfa511bf525dee81804bd28e3ab5776c96a2a434868419fac7bd86",
         "packages/element/skills/embed-metal-card/references/serving-and-csp.md": "75f0876a0a9596295965223a339cc6eb3f6c05a8a7aca97c2a60759c231c58bc",
         "packages/element/src/attributes.test.ts": "b355b64edd423f1180e08f14ab95ec92560dd119b81b20fb4c777186ec0d396e",
@@ -208,14 +208,14 @@
         "packages/element/src/standalone.ts": "546e056b32e3473d013e960257cf7f7bfe95a4a1e787052666f13466b527447e",
         "packages/element/vite.standalone.config.ts": "a9fe104bea21327fa38d1cb97ed7676ad851bd8d24a9257dbb076985f821299b",
         "packages/react/README.md": "9643c03677036a1ef6315b4a4bde8c864b1ed541c0e4f68fce3c31b4f0764553",
-        "packages/react/skills/metal-card-react/SKILL.md": "49068227ed4d8583873bf86b33d8deee8c04b8b7db0d1f0f0970061b5a70273e",
+        "packages/react/skills/metal-card-react/SKILL.md": "a4719f33372b0b691dbe8c93b48742c452586288f861869919e21e00e7064dca",
         "packages/react/src/index.tsx": "893632751ea4765bd9b8f43a92146fc9d1fbeb60c2a25a2d493a6909930d7f7b"
       },
-      "head": "bbd2610edbc1b6b107270aacc6e60ddb17e8ec06",
-      "outcome": "updated",
-      "reason": "The studio's public URL moved from card-studio.pages.dev (another project's site) to card3d-studio.pages.dev. The skills, READMEs and tests that quote a share link now use the new host; share tokens and parsing are unchanged.",
+      "head": "2c7037a31dcbc38455c35082490ed3e661cbe9c2",
+      "outcome": "no-change",
+      "reason": "metadata.library_version set (packages/core/skills → 0.1.1, packages/element/skills → 0.1.1, packages/react/skills → 0.1.1) by scripts/skill-versions.mjs after changeset version. No source or guidance change was pending review before this edit, so the reviewed guidance stands for this version; the version line is the only change.",
       "evidence": [
-        "Changed: packages/core/README.md, packages/core/skills/card-design-json/SKILL.md, packages/core/src/design/share.test.ts, packages/element/README.md, packages/element/skills/embed-metal-card/SKILL.md, packages/element/src/attributes.test.ts, packages/react/README.md at bbd2610edbc1b6b107270aacc6e60ddb17e8ec06"
+        "Changed: packages/core/skills/card-design-json/SKILL.md, packages/core/skills/custom-face-shaders-wgsl/SKILL.md, packages/core/skills/engine-stage/SKILL.md, packages/element/skills/embed-metal-card/SKILL.md, packages/react/skills/metal-card-react/SKILL.md at 2c7037a31dcbc38455c35082490ed3e661cbe9c2"
       ]
     },
     "source:crates/card3d-engine/shaders/liquid-metal.wgsl": {

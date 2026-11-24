@@ -1,6 +1,6 @@
 {
   "name": "@card3d/element",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Drop-in 3D metal cards for any page, Vue, Svelte or plain HTML: the <metal-card> custom element",
   "keywords": [
     "3d",
