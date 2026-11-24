@@ -99,7 +99,7 @@ async function exportPng(page: Page): Promise<Buffer> {
 
 test("card body: portrait, cutouts, anodised edge and contactless — live, undo, autosave, share link, export", async ({ page, browser }) => {
   // Many rebuilds, an export, a reload and a second browser context on software GL: 40–50 s under load.
-  test.setTimeout(120_000);
+  test.slow();
   await openStudio(page);
   const before = await canvasShot(page);
   const body = await openFolder(page, "Card body");
@@ -320,9 +320,14 @@ test("finishes and text lines: emboss, engrave, a card number line, code and glT
 
 test("metal-card fit: contain fills the element, studio keeps the studio camera; card body from the design", async ({ page }) => {
   await page.goto(`http://localhost:${EXAMPLE_PORT}/body.html`);
-  const ready = (sel: string) =>
-    expect.poll(() => page.locator(sel).evaluate((el) => (el as unknown as { ready: boolean }).ready), { timeout: 45_000 }).toBe(true);
+  // Each in view first: a card only starts near the viewport, and how far down the last one sits
+  // depends on the platform's fonts (on Linux it is past the fold).
+  const ready = async (sel: string) => {
+    await page.locator(sel).scrollIntoViewIfNeeded();
+    await expect.poll(() => page.locator(sel).evaluate((el) => (el as unknown as { ready: boolean }).ready), { timeout: 45_000 }).toBe(true);
+  };
   for (const sel of ["#contain", "#studio", "#portrait", "#window"]) await ready(sel);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(300);
   const contain = await cardShare(page, page.locator("#contain"));
   const studio = await cardShare(page, page.locator("#studio"));
@@ -346,7 +351,7 @@ test("metal-card fit: contain fills the element, studio keeps the studio camera;
 });
 
 test("the contactless mark draws over a sticker placed on it", async ({ page }) => {
-  test.setTimeout(90_000);
+  test.slow();
   await openStudio(page);
   // An opaque block sticker centred on the mark's place (right of the ISO chip): 30 % of the card wide.
   const sticker = await page.evaluate(() => {

@@ -18,8 +18,9 @@ export default defineConfig({
   // *.e2e.ts, so vitest (which collects *.spec.ts / *.test.ts) leaves them alone
   testMatch: "**/*.e2e.ts",
   outputDir: "./e2e/.results",
-  timeout: 60_000,
-  expect: { timeout: 20_000 },
+  // CI's runners render 2-3x slower than a laptop on SwiftShader (page screenshots take seconds).
+  timeout: process.env.CI ? 180_000 : 60_000,
+  expect: { timeout: process.env.CI ? 45_000 : 20_000 },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

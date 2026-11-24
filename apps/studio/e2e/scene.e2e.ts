@@ -9,26 +9,28 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Locator, Page } from "@playwright/test";
 import { EXAMPLE_PORT } from "../playwright.config.ts";
-import { canvasShot, cardCentre, diff, expect, folder, historyLabels, imageStats, openFolder, openStudio, row, settle, showHistory, test } from "./fixtures.ts";
+import {
+  canvasShot,
+  cardCentre,
+  diff,
+  expect,
+  folder,
+  historyLabels,
+  imageStats,
+  openFolder,
+  openStudio,
+  row,
+  setText,
+  settle,
+  showHistory,
+  smallExport,
+  test,
+} from "./fixtures.ts";
 
 const EXAMPLE = `http://localhost:${EXAMPLE_PORT}`;
 
 const sceneChip = (scene: Locator, id: string) => scene.locator(`.c3-chips--env .c3-chip[data-value="${id}"]`);
 const segment = (scene: Locator, value: string) => scene.locator(`.c3-seg-btn[data-value="${value}"]`);
-
-async function setText(r: Locator, value: string): Promise<void> {
-  const input = r.locator("input.tp-txtv_i").first();
-  await input.fill(value);
-  await input.press("Enter");
-}
-
-async function smallExport(page: Page, w = 640, h = 400): Promise<Locator> {
-  const exp = await openFolder(page, "Export");
-  await row(exp, "Size").locator("select").selectOption({ label: "Custom…" });
-  await setText(row(exp, "Width"), String(w));
-  await setText(row(exp, "Height"), String(h));
-  return exp;
-}
 
 async function download(page: Page, click: () => Promise<void>): Promise<{ name: string; bytes: Buffer }> {
   const d = page.waitForEvent("download", { timeout: 120_000 });
@@ -109,7 +111,7 @@ test("scene: Softbox by default, other HDRIs only when picked; sweep, floor and 
   page,
   browser,
 }) => {
-  test.setTimeout(150_000);
+  test.slow();
   const envRequests: string[] = [];
   page.on("request", (r) => /\/assets\/(softbox|cyclorama|loft|warm-hall|sunset)-[\w-]+\.webp$/.test(r.url()) && envRequests.push(new URL(r.url()).pathname));
   await openStudio(page);
@@ -212,7 +214,7 @@ test("lighting presets grade the Softbox HDRI: the card itself warms, cools, dar
 });
 
 test("video: a camera-path GIF of an animated card has the right frame count and is identical across exports", async ({ page }) => {
-  test.setTimeout(240_000);
+  test.slow();
   await openStudio(page);
   // An animated card (the shine add-on) on a staged floor.
   await page.locator('.c3-tabs-chips .c3-chip[data-value="effects"]').click();
@@ -248,7 +250,7 @@ test("video: a camera-path GIF of an animated card has the right frame count and
 });
 
 test("AR: the dialog explains AR on desktop and exports a real-scale USDZ and GLB", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.slow();
   await openStudio(page);
   await (await openFolder(page, "Export")).getByRole("button", { name: /View in AR/ }).click();
   const dialog = page.locator("dialog.c3-ar-dialog[open]");
@@ -265,7 +267,7 @@ test("AR: the dialog explains AR on desktop and exports a real-scale USDZ and GL
 });
 
 test("metal-card: environment and floor from the CDN bundle; the extras chunk and AR exporter load only when used", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.slow();
   const extras: string[] = [];
   const ar: string[] = [];
   const envs: string[] = [];

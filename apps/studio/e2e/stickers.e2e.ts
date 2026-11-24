@@ -66,7 +66,7 @@ async function chroma(page: Page, shot: Buffer, r: { x: number; y: number; w: nu
 }
 
 test("sticker picture tools: rotate and resize on the card, crop, grayscale — undo/redo, autosave, share link", async ({ page, browser }) => {
-  test.setTimeout(150_000);
+  test.slow();
   await openStudio(page);
   const stickers = await openFolder(page, "Stickers");
   await expect(stickerSection(page)).toBeHidden();
@@ -206,7 +206,7 @@ test("sticker picture tools: rotate and resize on the card, crop, grayscale — 
 });
 
 test("sticker crop mode: Esc cancels, aspect presets, double-click enters it", async ({ page }) => {
-  test.setTimeout(120_000);
+  test.slow();
   await openStudio(page);
   const stickers = await openFolder(page, "Stickers");
   await stickers.locator("button.c3-lib[title*='Planet']").click();

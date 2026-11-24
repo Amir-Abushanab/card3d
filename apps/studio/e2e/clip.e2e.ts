@@ -5,7 +5,7 @@
  */
 import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
-import { expect, openFolder, openStudio, settle, test } from "./fixtures.ts";
+import { expect, openStudio, settle, smallExport, test } from "./fixtures.ts";
 
 /** A face shader whose brightness ramps with time: without the seam fade, a loop jumps back to dark. */
 const GRADIENT_SHADER = `fn mainImage(uv: vec2f) -> vec4f {
@@ -25,20 +25,21 @@ async function openAnimatedCard(page: Page): Promise<void> {
 }
 
 async function record(page: Page, format: "gif" | "webm"): Promise<Buffer> {
-  const exp = await openFolder(page, "Export");
+  // Small frames: a software renderer pays per pixel, and the checks only need the card's face.
+  const exp = await smallExport(page, 480, 320);
   // The clip group's format list (beside its Record button).
   await exp
     .locator(".c3-group", { hasText: "VIDEO / GIF" })
     .locator("select")
     .first()
     .selectOption({ label: format === "gif" ? "GIF" : "WebM" });
-  const download = page.waitForEvent("download", { timeout: 150_000 });
+  const download = page.waitForEvent("download", { timeout: 0 }); // bounded by the test's timeout
   await exp.getByRole("button", { name: /Record spin/ }).click();
   return readFile((await (await download).path())!);
 }
 
 test("a GIF of an animated card on the spin path loops without a jump", async ({ page }) => {
-  test.setTimeout(240_000);
+  test.slow(); // 3x the timeout: a clip renders a few hundred frames
   await openAnimatedCard(page);
   const gif = await record(page, "gif");
   // Decode every frame; compare the seam (last → first) with the ordinary frame-to-frame change.
@@ -72,7 +73,7 @@ test("a GIF of an animated card on the spin path loops without a jump", async ({
 });
 
 test("a WebM clip has exact frame times: a real duration", async ({ page }) => {
-  test.setTimeout(240_000);
+  test.slow(); // 3x the timeout: a clip renders a few hundred frames
   await openAnimatedCard(page);
   const webm = await record(page, "webm");
   const duration = await page.evaluate(async (b64) => {

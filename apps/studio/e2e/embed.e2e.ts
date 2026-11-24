@@ -260,7 +260,7 @@ test("CDN bundle: a plain card loads one file; scenes, face shaders, glass, the 
   page,
   watch,
 }) => {
-  test.setTimeout(120_000);
+  test.slow();
   const chunks: string[] = [];
   page.on("request", (r) => {
     const p = new URL(r.url()).pathname;

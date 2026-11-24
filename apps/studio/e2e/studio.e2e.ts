@@ -13,6 +13,7 @@ import {
   openStudio,
   row,
   settle,
+  setText,
   showHistory,
   test,
 } from "./fixtures.ts";
@@ -31,13 +32,6 @@ const checkbox = (r: Locator) => r.locator("input[type=checkbox]");
 async function setCheckbox(r: Locator, on: boolean): Promise<void> {
   if ((await checkbox(r).isChecked()) !== on) await r.locator("label").first().click();
   await expect(checkbox(r)).toBeChecked({ checked: on });
-}
-
-/** Commit a Tweakpane text / number field. */
-async function setText(r: Locator, value: string): Promise<void> {
-  const input = r.locator("input.tp-txtv_i").first();
-  await input.fill(value);
-  await input.press("Enter");
 }
 
 /** Replace the shader editor's whole document by typing (CodeMirror keeps its own undo history). */
@@ -280,7 +274,7 @@ test("PNG export has the requested size and real content", async ({ page }) => {
 });
 
 test("no WebGL context loss over a 15 s animated run", async ({ page }) => {
-  test.setTimeout(90_000);
+  test.slow();
   await openStudio(page);
   await applyPreset(page, "effects", "gold-shine");
   await page.evaluate(() => {

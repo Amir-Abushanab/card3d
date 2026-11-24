@@ -68,18 +68,13 @@ export async function openStudio(page: Page, path = "/"): Promise<void> {
 
 /**
  * The first card's intro turns it into place over 3.6 s from its first frame, so a shot taken soon
- * after `openStudio` can catch it mid-turn (seen with Playwright 1.65's Chromium). The card has no idle
- * motion, so wait until two canvas shots in a row are identical; a design that animates on its own
- * never is, so give up after the intro's length plus a margin.
+ * after `openStudio` can catch it mid-turn. The stage reports the intro's state as `data-intro`; wait
+ * until it has finished (or never ran). Comparing canvas screenshots instead costs seconds per shot on
+ * a CI runner's software renderer, long enough for a toast to expire meanwhile.
  */
 async function introDone(page: Page): Promise<void> {
-  let last = await canvasShot(page);
-  for (const end = Date.now() + 5_000; Date.now() < end;) {
-    await page.waitForTimeout(150);
-    const shot = await canvasShot(page);
-    if (shot.equals(last)) return;
-    last = shot;
-  }
+  await page.waitForFunction(() => !["running", "interrupting"].includes(document.getElementById("stage")?.dataset.intro ?? ""), null, { timeout: 15_000 });
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 }
 
 /** Wait until the live card has (re)built and drawn a couple of frames. */
@@ -113,6 +108,22 @@ export function row(scope: Locator, label: string): Locator {
     .locator(".tp-lblv")
     .filter({ has: scope.page().locator(":scope > .tp-lblv_l", { hasText: new RegExp(`^\\s*${label.replace(/[()]/g, "\\$&")}\\s*$`) }) })
     .first();
+}
+
+/** Commit a Tweakpane text / number field. */
+export async function setText(r: Locator, value: string): Promise<void> {
+  const input = r.locator("input.tp-txtv_i").first();
+  await input.fill(value);
+  await input.press("Enter");
+}
+
+/** Open Export at a custom w × h: renders cost by the pixel on SwiftShader, and the default is 1800 × 1200. */
+export async function smallExport(page: Page, w = 640, h = 400): Promise<Locator> {
+  const exp = await openFolder(page, "Export");
+  await row(exp, "Size").locator("select").selectOption({ label: "Custom…" });
+  await setText(row(exp, "Width"), String(w));
+  await setText(row(exp, "Height"), String(h));
+  return exp;
 }
 
 /** Labels of the history list, newest last. */

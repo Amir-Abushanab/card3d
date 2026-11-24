@@ -115,7 +115,7 @@ test("font picker: the name re-rasterises in the picked open font, self-hosted",
 });
 
 test("logo upload: SVG mask and vector path, placement, autosave, share link and export", async ({ page, browser }) => {
-  test.setTimeout(90_000);
+  test.slow();
   await openStudio(page);
   const id = await openFolder(page, "Identity");
   const hint = id.locator(".c3-logo-hint");
