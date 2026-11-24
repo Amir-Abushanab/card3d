@@ -188,7 +188,7 @@ struct PlaneVertex {
 }
 
 /// A lighting preset's reshaping of the panels (`EnvironmentLook`): role gains, tints, rim panels.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Look {
     pub key: Option<f64>,
     pub fill: Option<f64>,

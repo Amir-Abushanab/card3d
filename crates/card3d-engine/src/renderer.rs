@@ -468,7 +468,7 @@ impl Shared {
         quality: crate::quality::Quality,
     ) -> Shared {
         let env_size = env::EnvSize::new(quality.preset().environment_resolution);
-        Shared { core: Rc::new(Core::new(device, format, env_size)), atlas: env::build_environment(device, queue, look, quality, None) }
+        Shared { core: core(device, format, env_size), atlas: env::build_environment(device, queue, look, quality, None) }
     }
 
     /// The same core with another environment of the same size (a lighting preset's).
@@ -524,6 +524,56 @@ fn core(device: &wgpu::Device, format: wgpu::TextureFormat, size: env::EnvSize) 
     })
 }
 
+/// A studio environment's inputs (`Environment::Studio`).
+type StudioKey = (Option<env::Look>, crate::quality::Quality, Option<[f32; 3]>);
+
+/// What the cards made on a device keep for the next card made on it: a stage builds the next card
+/// while the last is still shown (Card Studio builds one on every panel change), and finds the maps
+/// (`MapCache`) and the studio environments it needs made. It lives while a card made on the device
+/// does (`DEVICE_CACHES`).
+#[derive(Default)]
+pub(crate) struct DeviceCache {
+    maps: Rc<crate::card::MapCache>,
+    /// The last two studio environments made, the latest last.
+    studio: RefCell<Vec<(StudioKey, wgpu::Texture)>>,
+}
+
+thread_local! {
+    /// Each device's cache (by address, as `CORES`), while a card made on it lives.
+    static DEVICE_CACHES: RefCell<Vec<(usize, std::rc::Weak<DeviceCache>)>> = const { RefCell::new(Vec::new()) };
+}
+
+/// The cache of `device` (`DEVICE_CACHES`).
+fn device_cache(device: &wgpu::Device) -> Rc<DeviceCache> {
+    let at = std::ptr::from_ref::<wgpu::Device>(device) as usize;
+    DEVICE_CACHES.with_borrow_mut(|caches| {
+        caches.retain(|e| e.1.strong_count() > 0);
+        if let Some(cache) = caches.iter().find(|e| e.0 == at).and_then(|e| e.1.upgrade()) {
+            return cache;
+        }
+        let cache = Rc::new(DeviceCache::default());
+        caches.push((at, Rc::downgrade(&cache)));
+        cache
+    })
+}
+
+impl DeviceCache {
+    /// The studio environment for `key`, made once (each compiles its shaders, renders a cube and
+    /// prefilters it).
+    fn studio(&self, device: &wgpu::Device, queue: &wgpu::Queue, key: StudioKey) -> wgpu::Texture {
+        let mut made = self.studio.borrow_mut();
+        let atlas = match made.iter().position(|e| e.0 == key) {
+            Some(i) => made.remove(i).1,
+            None => env::build_environment(device, queue, key.0.as_ref(), key.1, key.2),
+        };
+        made.push((key, atlas.clone()));
+        if made.len() > 2 {
+            made.remove(0);
+        }
+        atlas
+    }
+}
+
 /// The canvas's multisampled colour and depth, shared by renderers that draw one frame in turn
 /// (`Renderer::render_layer`), with the frame's projection.
 pub struct Layers {
@@ -559,6 +609,8 @@ impl Layers {
 
 pub struct Renderer {
     pub(crate) core: Rc<Core>,
+    /// Its device's cache (`DeviceCache`), kept while the renderer lives.
+    cache: Rc<DeviceCache>,
     pub(crate) frame_buffer: wgpu::Buffer,
     frame_bind_group: wgpu::BindGroup,
     pub(crate) meshes: Vec<GpuMesh>,
@@ -759,10 +811,11 @@ impl Renderer {
     /// `environment`: the studio rig (a lighting preset's look, the quality tier, the clear colour) or
     /// a scene's prefiltered HDRI.
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat, environment: Environment<'_>) -> Self {
+        let cache = device_cache(device);
         let (core, atlas) = match environment {
             Environment::Studio { look, quality, clear } => {
                 let size = env::EnvSize::new(quality.preset().environment_resolution);
-                (core(device, format, size), env::build_environment(device, queue, look, quality, clear))
+                (core(device, format, size), cache.studio(device, queue, (look.cloned(), quality, clear)))
             }
             Environment::Atlas(atlas, size) => (core(device, format, size), atlas),
             Environment::Shared(s) => (s.core, s.atlas),
@@ -777,6 +830,7 @@ impl Renderer {
         let samplers = HashMap::new();
         let mut r = Renderer {
             core,
+            cache,
             frame_buffer,
             frame_bind_group,
             meshes: Vec::new(),
@@ -806,6 +860,11 @@ impl Renderer {
         };
         r.white = r.texture(device, queue, &[(1, 1, vec![255; 4])], false, Wrap::Clamp);
         r
+    }
+
+    /// The maps the cards made on this renderer's device share (`DeviceCache`).
+    pub(crate) fn device_maps(&self) -> Rc<crate::card::MapCache> {
+        self.cache.maps.clone()
     }
 
     /// Tags the untagged items from `from` on (`tags`).
