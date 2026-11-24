@@ -44,7 +44,7 @@ fn foil_values_keep_the_key() {
         ("backHoloStyle", "\"gold\""),
         ("backFoilCoverage", "\"tile\""),
     ] {
-        assert_eq!(key(with_recipe(k, v)), base, "{k}");
+        assert!(key(with_recipe(k, v)) == base, "{k}");
     }
 }
 
@@ -53,17 +53,17 @@ fn anything_else_changes_the_key() {
     let base = key(json::parse(BASE).unwrap());
     // Which sides have a foil, the body's recipe, the rest of the design.
     for (k, v) in [("frontHolo", "false"), ("backHolo", "true"), ("matchHoloSides", "false"), ("grain", "31"), ("polish", "60"), ("color", "\"#000000\"")] {
-        assert_ne!(key(with_recipe(k, v)), base, "{k}");
+        assert!(key(with_recipe(k, v)) != base, "{k}");
     }
     let other = BASE.replace("Ada Lovelace", "Grace Hopper");
-    assert_ne!(key(json::parse(&other).unwrap()), base);
+    assert!(key(json::parse(&other).unwrap()) != base);
     let other = BASE.replace(r#""decals": []"#, r#""decals": [], "lighting": "noir""#);
-    assert_ne!(key(json::parse(&other).unwrap()), base);
+    assert!(key(json::parse(&other).unwrap()) != base);
     // The card's options, and the host's assets.
     let doc = || json::parse(BASE).unwrap();
     let options = |o: CardOptions| BuildKey::new(doc(), &o, vec!["artwork.png".into()]).unwrap();
-    assert_ne!(options(CardOptions { quality: Quality::Performance, ..Default::default() }), base);
-    assert_ne!(options(CardOptions { custom_font_family: Some("Inter".into()), ..Default::default() }), base);
-    assert_ne!(options(CardOptions { reduced_motion: true, ..Default::default() }), base);
-    assert_ne!(BuildKey::new(doc(), &CardOptions::default(), vec![]).unwrap(), base);
+    assert!(options(CardOptions { quality: Quality::Performance, ..Default::default() }) != base);
+    assert!(options(CardOptions { custom_font_family: Some("Inter".into()), ..Default::default() }) != base);
+    assert!(options(CardOptions { reduced_motion: true, ..Default::default() }) != base);
+    assert!(BuildKey::new(doc(), &CardOptions::default(), vec![]).unwrap() != base);
 }

@@ -3,7 +3,6 @@
 
 use glam::{Mat4, Vec3};
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::canvas::{Host, ImagePurpose};
@@ -80,7 +79,7 @@ const RETUNABLE: [&str; 14] = [
 /// design's JSON without the `RETUNABLE` recipe keys, the card's options, and what else the host
 /// supplies for it (`assets`; the web's: its images' sources). Cards built with equal keys differ only
 /// in those values.
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub struct BuildKey {
     design: Value,
     options: (crate::quality::Quality, Option<String>, bool, bool, Option<u32>, bool),
@@ -117,7 +116,8 @@ type SurfaceKey = (u32, u64, u64, String, bool);
 /// last is still shown (Card Studio builds one on every panel change), finds them made.
 #[derive(Default)]
 pub struct MapCache {
-    surfaces: RefCell<HashMap<SurfaceKey, Rc<SharedSurface>>>,
+    /// A few at a time: a list (no hash map's code in the main wasm module).
+    surfaces: RefCell<Vec<(SurfaceKey, Rc<SharedSurface>)>>,
     chip: RefCell<Option<(wgpu::Texture, wgpu::Texture)>>,
 }
 
@@ -127,17 +127,17 @@ impl MapCache {
         let orbit = recipe.pattern == "orbit";
         let key = (size, recipe.grain.to_bits(), recipe.relief.to_bits(), recipe.texture.clone(), orbit);
         let mut cache = self.surfaces.borrow_mut();
-        if let Some(s) = cache.get(&key) {
+        if let Some((_, s)) = cache.iter().find(|e| e.0 == key) {
             return s.clone();
         }
-        cache.retain(|_, s| Rc::strong_count(s) > 1);
+        cache.retain(|(_, s)| Rc::strong_count(s) > 1);
         let mut maps = material::surface_maps(size, recipe.grain, recipe.relief, &recipe.texture, orbit);
         let up = |px: &[u8]| crate::renderer::upload(device, queue, &material::mip_chain(px, size, size, false), false);
         let (normal, rough) = (up(&maps.normal), up(&maps.roughness));
         maps.normal = Vec::new();
         maps.roughness = Vec::new();
         let s = Rc::new(SharedSurface { normal, rough, maps });
-        cache.insert(key, s.clone());
+        cache.push((key, s.clone()));
         s
     }
 

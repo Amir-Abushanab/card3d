@@ -103,19 +103,20 @@ mod build {
 
 /// What a build's images (`CardStage::build`) say about the card besides the design (`BuildKey`): the
 /// keys of the decoded files, which a key's source names (one source, one file), and the strings
-/// whole (the name font's family).
+/// whole (the name font's family), sorted (the loader adds them as they load).
 fn assets(images: Option<&js_sys::Map>) -> Vec<String> {
-    let mut out = Vec::new();
+    let mut out: Vec<String> = Vec::new();
     if let Some(m) = images {
         m.for_each(&mut |v, k| {
             let k = k.as_string().unwrap_or_default();
-            out.push(match v.as_string() {
-                Some(v) => format!("{k}={v}"),
+            let entry = match v.as_string() {
+                Some(v) => k + "=" + &v,
                 None => k,
-            });
+            };
+            // A few entries: inserted in order (smaller code than a sort).
+            out.insert(out.partition_point(|e| *e < entry), entry);
         });
     }
-    out.sort();
     out
 }
 
