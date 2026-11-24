@@ -66,10 +66,10 @@
       ]
     },
     "skill:packages/core/skills/engine-stage/SKILL.md": {
-      "fingerprint": "7b62ab7e7503957337d2a89f492562b43846c6584de0683367bee3685617d75d",
+      "fingerprint": "1f0966bfe9deba778c17c23ec6e16df4e235b34d24096bb60e93197c1dbffa8b",
       "snapshot": {
-        "packages/core/README.md": "891afc9411b3584003609a2be25148d433202d7906871f921dea2344d87eecec",
-        "packages/core/skills/engine-stage/SKILL.md": "54c39436498994c7524aff777ff5145350f7e85d3b9fc03b66b89d3ae60dd9ee",
+        "packages/core/README.md": "c07cffca224b4bfa0d04b904d36b2a2db5d9b61143ee40a14b4ceacdff0e276f",
+        "packages/core/skills/engine-stage/SKILL.md": "6483e9d84be879ee1a17feab95a1c30c0de90e02b82af73e370219db7f3a15a9",
         "packages/core/skills/engine-stage/references/exports.md": "951a050e8a701747359c56c0a0ff93612ef2a77dd5275bd8c847ff83a675fcb1",
         "packages/core/skills/engine-stage/references/stage-api.md": "09fc29611d0d07f7e2ae66bdd6ddc4ed7ceec29ef2c119070f5234ee1f2d9256",
         "packages/core/src/ar/ar.test.ts": "de91bb2a74719bd3797ac1f0261eab5d1344216ff50e8d395e5af74f9da82cbe",
@@ -88,15 +88,20 @@
         "packages/core/src/scene/camera-paths.ts": "ace251438f75194855ba955d14538a258b59b86fa5f43fbe4fe55b09012adc72",
         "packages/core/src/standalone.ts": "6a701844d6578fb05b4c20dc43536b620f3451c6036f43d859527a150b65a754"
       },
-      "head": "740b9c8e64c43932281acd7a5819bf1094771868",
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
       "outcome": "updated",
-      "reason": "createEngineStage now starts the engine download when it is created (was: after the first design's fonts and images), and setPaused also holds animated GIF stickers and detaches the window pointer/wheel listeners (now attached only for live liquid metal). SKILL.md says when the download starts; references/stage-api.md's setPaused row says what it stops. The a11y attribute and preload changes add no API.",
+      "reason": "The loader now downloads the engine parts a design needs together, as the design is set (was: each when the build reached it), and on WebGPU a page's stages share one device, so a lost device moves every stage to the WebGL build (was: only the stage whose device it was). SKILL.md's overview and many-cards entry, and core's README, now say so; stage API, options and callbacks unchanged.",
       "evidence": [
-        "Checks at 740b9c8: intent validate (5 skills) and skill-references --check pass; pnpm check passes (format, lint, typecheck, knip, depcruise, notices, all unit tests incl. packages/react SSR tests and packages/core/src/webgpu-marks.test.ts); crates/card3d-web/web/fallback.test.mjs passes all 9 checks; studio e2e specs embed, stickers, showcase, studio, fonts, clip, print pass. Not run: fresh-consumer task checks (skill_spec.md, Remaining work)."
+        "packages/core/wasm/loader.js (engineParts, preloadParts)",
+        "crates/card3d-web/src/lib.rs (page device)",
+        "crates/card3d-web/web/fallback.test.mjs: two cards on one device fall over together (passed)",
+        "intent validate: 5 skills passed",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch",
+        "Fresh-consumer check not run (skill_spec.md, Remaining work)"
       ]
     },
     "skill:packages/element/skills/embed-metal-card/SKILL.md": {
-      "fingerprint": "3d28f32b2d002b832250b21216182b6551f92d16ed41983f39cd1463813ce994",
+      "fingerprint": "5a0e70e2d0f8c7fe52c216a1e1a51e711f1e49ea99ee8f8df24786815c2b861d",
       "snapshot": {
         "packages/element/README.md": "e56b162c746d539ab5b3bcd74f14e80b6a0ce9ff5227a56cd58bb5032f3cd539",
         "packages/element/skills/embed-metal-card/SKILL.md": "9353b02b4ea6cac30c4426abfeb0e7866a152aba7fcd5a72de5601595d411943",
@@ -106,15 +111,17 @@
         "packages/element/src/attributes.ts": "29633f49b4f3fcf0b4e3b063b9e3d0de40b744930d7946a2cc68e50f746a7419",
         "packages/element/src/element.ts": "a0fec4bca3c20a6900259b56d9c46a1782bfb73f64cb5e10deaba1cc712b8431",
         "packages/element/src/index.ts": "dd2ffad0d612fa0d081ab2161ed39ad693a1ee31447cc90b9791f8738b8ddb99",
-        "packages/element/src/pool.ts": "40f008d6e8561b8aadd88ca7baa797da1c754d69f41eb7692c528405a786afca",
+        "packages/element/src/pool.ts": "d6cd1758d57a976291cf3c5af37c6345723e041f7011d8822a930bd39b87d1f3",
         "packages/element/src/standalone.ts": "546e056b32e3473d013e960257cf7f7bfe95a4a1e787052666f13466b527447e",
         "packages/element/vite.standalone.config.ts": "a9fe104bea21327fa38d1cb97ed7676ad851bd8d24a9257dbb076985f821299b"
       },
-      "head": "bbd2610edbc1b6b107270aacc6e60ddb17e8ec06",
-      "outcome": "updated",
-      "reason": "The studio's public URL moved from card-studio.pages.dev (another project's site) to card3d-studio.pages.dev. The skills, READMEs and tests that quote a share link now use the new host; share tokens and parsing are unchanged.",
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "packages/element/src/pool.ts changed only in its doc comment (why the 12-card limit holds on WebGPU too). The skill's statement (at most 12 live cards, maxContexts, lower it with other WebGL) stays accurate.",
       "evidence": [
-        "Changed: packages/element/README.md, packages/element/skills/embed-metal-card/SKILL.md, packages/element/src/attributes.test.ts at bbd2610edbc1b6b107270aacc6e60ddb17e8ec06"
+        "git diff 2978b60..HEAD -- packages/element/src/pool.ts: comment only",
+        "intent validate: 5 skills passed",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
       ]
     },
     "skill:packages/react/skills/metal-card-react/SKILL.md": {
@@ -132,14 +139,14 @@
       ]
     },
     "planning:_artifacts": {
-      "fingerprint": "419e21b84e9a7d275c79a1ec98dc4861f1bcd4a4bb647f7213a44272bdcaeeaa",
+      "fingerprint": "fc3600f013d96f589bdb865f3e699d7ca110693422f4fc22c1f94422a5090fe3",
       "snapshot": {
         "_artifacts/domain_map.yaml": "c589256bfa75937f3bfcf2729393162193f647ef7248de8f5abbbf2c7c522933",
-        "_artifacts/skill_spec.md": "b837c6550b338aff84d7ae0a8328679389afeb19e263050e31a0b58679acf57d",
+        "_artifacts/skill_spec.md": "cc44e1bbe51f04c267aed6d933865cd65e6d3514ac63a89a70033285c92d0663",
         "_artifacts/skill_tree.yaml": "04deb73aae2cfa86616f2b7102e843789e7fe663ffcc643658832f2d9b81256e",
         "crates/card3d-engine/shaders/face/prelude.wgsl": "63c27f150678f7e40847a7ccaaf1b7eeeafba44dc60c91425bb2759a6c3f20fb",
         "crates/card3d-engine/src/face_custom.rs": "ce8eee2c04f4f92c3b788981a34f8c9431a116c45f127c51c89f9ac24e5cd270",
-        "packages/core/README.md": "891afc9411b3584003609a2be25148d433202d7906871f921dea2344d87eecec",
+        "packages/core/README.md": "c07cffca224b4bfa0d04b904d36b2a2db5d9b61143ee40a14b4ceacdff0e276f",
         "packages/core/skills/card-design-json/SKILL.md": "c2ba812c7a16a294a9389fc31b61b50c48f37d6b0160c196956d0b4a349e105a",
         "packages/core/skills/card-design-json/references/design-fields.md": "acb93f9ac2df0062894df5e416b00c715ee312b7023374eedb4258eec5cba254",
         "packages/core/skills/card-design-json/references/examples.md": "e43cc626d6d61820693e5bfe51bc8cca8966af89b32cbf4b61adc5deab75f8cd",
@@ -147,7 +154,7 @@
         "packages/core/skills/card-design-json/references/shaders-and-effects.md": "cdb0d669c7f509e93304e935456dca20e82c0cdb5fb9015ed51fddff73c140cb",
         "packages/core/skills/custom-face-shaders-wgsl/SKILL.md": "434babef8aef75fae06a3b551d2cfd1d65959ff796ab1e0bcb92a9f10dad873d",
         "packages/core/skills/custom-face-shaders-wgsl/references/prelude.md": "e964ab52a19989592a979b8721e23df3e372e287c58afd5bac6040a2af773b64",
-        "packages/core/skills/engine-stage/SKILL.md": "54c39436498994c7524aff777ff5145350f7e85d3b9fc03b66b89d3ae60dd9ee",
+        "packages/core/skills/engine-stage/SKILL.md": "6483e9d84be879ee1a17feab95a1c30c0de90e02b82af73e370219db7f3a15a9",
         "packages/core/skills/engine-stage/references/exports.md": "951a050e8a701747359c56c0a0ff93612ef2a77dd5275bd8c847ff83a675fcb1",
         "packages/core/skills/engine-stage/references/stage-api.md": "09fc29611d0d07f7e2ae66bdd6ddc4ed7ceec29ef2c119070f5234ee1f2d9256",
         "packages/core/src/ar/ar.test.ts": "de91bb2a74719bd3797ac1f0261eab5d1344216ff50e8d395e5af74f9da82cbe",
@@ -204,18 +211,19 @@
         "packages/element/src/attributes.ts": "29633f49b4f3fcf0b4e3b063b9e3d0de40b744930d7946a2cc68e50f746a7419",
         "packages/element/src/element.ts": "a0fec4bca3c20a6900259b56d9c46a1782bfb73f64cb5e10deaba1cc712b8431",
         "packages/element/src/index.ts": "dd2ffad0d612fa0d081ab2161ed39ad693a1ee31447cc90b9791f8738b8ddb99",
-        "packages/element/src/pool.ts": "40f008d6e8561b8aadd88ca7baa797da1c754d69f41eb7692c528405a786afca",
+        "packages/element/src/pool.ts": "d6cd1758d57a976291cf3c5af37c6345723e041f7011d8822a930bd39b87d1f3",
         "packages/element/src/standalone.ts": "546e056b32e3473d013e960257cf7f7bfe95a4a1e787052666f13466b527447e",
         "packages/element/vite.standalone.config.ts": "a9fe104bea21327fa38d1cb97ed7676ad851bd8d24a9257dbb076985f821299b",
         "packages/react/README.md": "9643c03677036a1ef6315b4a4bde8c864b1ed541c0e4f68fce3c31b4f0764553",
         "packages/react/skills/metal-card-react/SKILL.md": "be41291cfcaf95a9e0f318d70792ef4299af4319c29c3aa16c1b85e0d2666036",
         "packages/react/src/index.tsx": "a985949224b47db69666e4d3cf6e6030a9443c513110e32fd27b2e494529367a"
       },
-      "head": "740b9c8e64c43932281acd7a5819bf1094771868",
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
       "outcome": "updated",
-      "reason": "skill_spec.md: a 'Performance pass (2026-11-24)' entry in Coverage and batch history (source change, guidance, checks). domain_map.yaml: metal-card-react gains the 'editing the design object in place' failure mode. skill_tree.yaml: verified accurate (no description or source mapping changed).",
+      "reason": "skill_spec.md gains the batch's history entry and the pool-limit decision; domain_map.yaml and skill_tree.yaml verified accurate: no developer task, failure mode, description or source mapping changed.",
       "evidence": [
-        "Checks at 740b9c8: intent validate (5 skills) and skill-references --check pass; pnpm check passes (format, lint, typecheck, knip, depcruise, notices, all unit tests incl. packages/react SSR tests and packages/core/src/webgpu-marks.test.ts); crates/card3d-web/web/fallback.test.mjs passes all 9 checks; studio e2e specs embed, stickers, showcase, studio, fonts, clip, print pass. Not run: fresh-consumer task checks (skill_spec.md, Remaining work)."
+        "_artifacts/skill_spec.md (Coverage and batch history)",
+        "intent validate: 5 skills passed"
       ]
     },
     "source:crates/card3d-engine/shaders/liquid-metal.wgsl": {
@@ -267,39 +275,48 @@
       ]
     },
     "source:packages/core/wasm/loader.d.ts": {
-      "fingerprint": "335b7d4f6edfea4f24c03b2498045c317b678928770218287a6cb546e5976b6f",
+      "fingerprint": "4615a7f526629128477a1091491992fecb303b7367c1d6344fb0ace005c45dd8",
       "snapshot": {
-        "packages/core/wasm/loader.d.ts": "e4adbccf161729e9ee825cc1670cac72110a558fcb9fe74d0124c9d5f4010f13"
+        "packages/core/wasm/loader.d.ts": "9a43e98d2905a9eb7699dfbc62ec68961218bab9a76dfe06838e9df9270dc5af"
       },
-      "head": "740b9c8e64c43932281acd7a5819bf1094771868",
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
       "outcome": "no-change",
-      "reason": "Types for the loader's new internal exports (preloadEngine, webgpuDistrusted, holdWebgpuStart, EngineCard.setPaused); none is a package entry point, so no guidance names them.",
+      "reason": "Types for the loader's new engineParts / preloadParts (wasm/loader.js is not a public entry point).",
       "evidence": [
-        "Checks at 740b9c8: intent validate (5 skills) and skill-references --check pass; pnpm check passes (format, lint, typecheck, knip, depcruise, notices, all unit tests incl. packages/react SSR tests and packages/core/src/webgpu-marks.test.ts); crates/card3d-web/web/fallback.test.mjs passes all 9 checks; studio e2e specs embed, stickers, showcase, studio, fonts, clip, print pass. Not run: fresh-consumer task checks (skill_spec.md, Remaining work)."
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
       ]
     },
     "source:packages/core/wasm/loader.js": {
-      "fingerprint": "714c6d6446f096264447f48c9c4689359a7aaa34a6d38ff3636705d51262fb41",
+      "fingerprint": "bfa1e9859e02f14f8fa7dd64213f8c55a889b62f7f6ca77985c3c3df0f4748f0",
       "snapshot": {
-        "packages/core/wasm/loader.js": "7370d62b415c48714dc166746814212d9ff3c0953c70ebdb4ff39b90554f1469"
+        "packages/core/wasm/loader.js": "96e465b17bdf4333039c62fe789f9ec68d973a075e08e80fa88db1877d8771c9"
       },
-      "head": "740b9c8e64c43932281acd7a5819bf1094771868",
-      "outcome": "updated",
-      "reason": "Internal engine loader (not a package entry point): page-wide count of WebGPU starts so a second card's start isn't read as a crash, adapter check cached, preloadEngine, one import() per build, decoded-image cache, readback context released, card.setPaused for GIF stickers. Its user-visible effects are covered by the engine-stage update (download timing, setPaused); the embed-metal-card serving reference already says a visitor downloads one build, which is now true for multi-card pages too.",
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "The loader preloads a design's engine parts with the main module; covered by engine-stage's update.",
       "evidence": [
-        "Checks at 740b9c8: intent validate (5 skills) and skill-references --check pass; pnpm check passes (format, lint, typecheck, knip, depcruise, notices, all unit tests incl. packages/react SSR tests and packages/core/src/webgpu-marks.test.ts); crates/card3d-web/web/fallback.test.mjs passes all 9 checks; studio e2e specs embed, stickers, showcase, studio, fonts, clip, print pass. Not run: fresh-consumer task checks (skill_spec.md, Remaining work)."
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
       ]
     },
     "source:packages/core/wasm/marquee.js": {
-      "fingerprint": "704924a5c7edf051483666bde81e2d06b6faae043c20896c7274182f291284da",
+      "fingerprint": "a3bb45042780ab645139a27f8b9cde1b10341b88ff9221cae49b146e6c459eba",
       "snapshot": {
-        "packages/core/wasm/marquee.js": "a3f97abffb3376fe674fe08822658b654a1eeab5d25bc5b28ed0ef44758f1910"
+        "packages/core/wasm/marquee.js": "d352cccfb9bc4ec966b15c5a9c974e9d4b7506bf36150d479aec1fad0acb3063"
       },
-      "head": "740b9c8e64c43932281acd7a5819bf1094771868",
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
       "outcome": "no-change",
-      "reason": "The marquee uses the loader's shared start hold and preload instead of its own mark handling; fall-over behaviour is unchanged and engine-stage only shows mountMarquee, which this doesn't change.",
+      "reason": "The marquee page side preloads its part and each slot design's parts. Marquee API unchanged.",
       "evidence": [
-        "Checks at 740b9c8: intent validate (5 skills) and skill-references --check pass; pnpm check passes (format, lint, typecheck, knip, depcruise, notices, all unit tests incl. packages/react SSR tests and packages/core/src/webgpu-marks.test.ts); crates/card3d-web/web/fallback.test.mjs passes all 9 checks; studio e2e specs embed, stickers, showcase, studio, fonts, clip, print pass. Not run: fresh-consumer task checks (skill_spec.md, Remaining work)."
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
       ]
     },
     "source:crates/card3d-engine/shaders/card.wgsl": {
@@ -316,16 +333,18 @@
       ]
     },
     "source:crates/card3d-engine/src/card.rs": {
-      "fingerprint": "d90a68237a6d55e956aa9a34a995b89f08f7361ab616949708c291ac738f78f5",
+      "fingerprint": "833ba399d656017939259ec245d9829d80b88ce65e137d02c05a959425f21878",
       "snapshot": {
-        "crates/card3d-engine/src/card.rs": "435b637c9de8151b7ce62f18f4d16eaa7893741dc60003f2ad22342fa2bc0cca"
+        "crates/card3d-engine/src/card.rs": "71d7c035a53d7152fcb50c9d96526a30422b9e997965206282868381a66476d9"
       },
-      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
       "outcome": "no-change",
-      "reason": "Internal: the marquee's map cache now also serves stage cards (by device), and BuildKey/CardRenderer::retune let a stage take foil-value-only design changes in place. Stage.setDesign keeps its contract (resolves true when shown, false when replaced); retuned cards draw identically to built ones (crates/card3d-tools/tests/retune.rs). No skill-described field or behaviour changed.",
+      "reason": "Internal: a card's bind groups and card-shader pipelines are made at the end of its build (Renderer::warm), face layers' prepare no longer takes the pose.",
       "evidence": [
-        "Changed: crates/card3d-engine/src/card.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
-        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
       ]
     },
     "source:crates/card3d-engine/src/design.rs": {
@@ -368,16 +387,18 @@
       ]
     },
     "source:crates/card3d-engine/src/marquee.rs": {
-      "fingerprint": "0454a3b597652cdab4f98e952d2db52df84f33ceb043fff23fbfa3c8b7ab98e7",
+      "fingerprint": "def727e610d97baf10b8e2bfa0e8a585952d20093f1204a23d142ed5402a4d40",
       "snapshot": {
-        "crates/card3d-engine/src/marquee.rs": "188b0c1f3dfed30563c822cfc92b0ced986f5b038068497eea2266535ee55300"
+        "crates/card3d-engine/src/marquee.rs": "4c393ff089bcf6d0f510e039e74557139739c377acbad1752a8f222dacf08655"
       },
-      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
       "outcome": "no-change",
-      "reason": "Internal: the map cache moved to card.rs (same code, shared with stage cards); marquee renders byte-identical at the harness's 6 strip states × 2 sizes.",
+      "reason": "Internal: the marquee draws its cards through Renderer::render_layers (one pass, one resolve, one submission).",
       "evidence": [
-        "Changed: crates/card3d-engine/src/marquee.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
-        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
       ]
     },
     "source:crates/card3d-engine/src/material.rs": {
@@ -394,16 +415,18 @@
       ]
     },
     "source:crates/card3d-engine/src/renderer.rs": {
-      "fingerprint": "78ce1ec18861795657aa4b6fc7b73a2cf0c9f875b9c142106127086fecdab476",
+      "fingerprint": "3c4b17621e438207ebba4a45a5305c3ff8ca1eb832c310d23374803df50dd7c4",
       "snapshot": {
-        "crates/card3d-engine/src/renderer.rs": "bc88403a12b337ed59ee205ce107ef87c8a4eb6a8eab7a81f68c7dbc70a6d6c4"
+        "crates/card3d-engine/src/renderer.rs": "f2df421de8ebe43a2a979685ac627be4a9ffea4c5e6405882246545266c626e5"
       },
-      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
       "outcome": "no-change",
-      "reason": "Internal: black point lights are left out of the frame uniform, a device cache (surface/chip maps, studio environments) is kept while a card on the device lives, the marquee's core joins the pipeline cache, and holo draws know their side. Renders byte-identical (cache hits and misses); no API or behaviour the skills describe changed.",
+      "reason": "Internal: per-device memo; item uniforms in one buffer at dynamic offsets written once per frame; frame preparation split from recording; render_layers for several cards in one pass.",
       "evidence": [
-        "Changed: crates/card3d-engine/src/renderer.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
-        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
       ]
     },
     "source:crates/card3d-engine/src/stage.rs": {
@@ -433,16 +456,213 @@
       ]
     },
     "source:crates/card3d-web/src/lib.rs": {
-      "fingerprint": "abb4c831f8e503254a0befec9a9d6be89e59829bc2be0dbf68b10acb44d51d18",
+      "fingerprint": "c795de8c6f742d272ad4e4dea5a6751156071be49b3650f869e1ebf0028fc8d7",
       "snapshot": {
-        "crates/card3d-web/src/lib.rs": "37e971585fa388a20d72b27615047f5a7120a697a4aef7a3632abd6808bf56f1"
+        "crates/card3d-web/src/lib.rs": "8f794b3237f25ebef6435af7de1ab022b6a65dadeb97db7d7abddc2f02e189ce"
       },
-      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
       "outcome": "no-change",
-      "reason": "Internal: build() parses the design once, retunes the stage's card in place when only foil values changed, and installs cards with their BuildKey. The JS-facing build/setDesign contract (resolves true when shown, false when replaced) is unchanged.",
+      "reason": "WebGPU build: one device per page shared by every view; behaviour embedders see (fall-over of every stage on a lost device) is covered by engine-stage's update.",
       "evidence": [
-        "Changed: crates/card3d-web/src/lib.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
-        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:crates/card3d-engine/src/effects.rs": {
+      "fingerprint": "772a328ba54d336428dca31c4b3af6f0615975182baa511377f69822f07c9bbe",
+      "snapshot": {
+        "crates/card3d-engine/src/effects.rs": "1192a1d1983c8a553945173ee055b2ebd79895be49c09ec8a6eef05d91be11e0"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Internal: effect shader modules, bind group layouts and pipelines come from a per-device memo (renderer::memo).",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:crates/card3d-engine/src/face_shaders.rs": {
+      "fingerprint": "2c6c866d715d92afa25fafd261d875f7f9754bfab649c6c7d1c08cc5ad1d79e4",
+      "snapshot": {
+        "crates/card3d-engine/src/face_shaders.rs": "23ceaa32d8940f721564fba657daf0cd6067be8ae95ff350237be50d91120739"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Internal: face shader modules, layouts and pipelines are kept per device (custom code only once it compiled and linked); live layers alone rewrite their uniforms (the renderer writes an overlay's eye per view). Custom-shader error reporting unchanged.",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:crates/card3d-engine/src/glass.rs": {
+      "fingerprint": "87455bae4aa3e64fa03ad209e975e231778448a71966e63be7e21b6703fdcc0c",
+      "snapshot": {
+        "crates/card3d-engine/src/glass.rs": "414efef2b1e13c931e739550b4794e0daef9f85c8d5336cdd5c4a96d530002bd"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Internal: the glass pass rewrites its item's slot of the renderer's uniform buffer.",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:crates/card3d-engine/src/liquid_metal.rs": {
+      "fingerprint": "9d4c7bd927bd9f31171de3783640c64d7fe08b1a78d70afdbc7ac08e73c6238e",
+      "snapshot": {
+        "crates/card3d-engine/src/liquid_metal.rs": "fda4ad027491da12a9af791b2bafdbaaed417d69ad2ff26eb24f42797816fbf8"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Internal: processed masks (by image content or brand mark width) and the Paper pipeline are kept per device.",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:crates/card3d-engine/src/print.rs": {
+      "fingerprint": "a8e09c90c4609143cee5ab290245ad7eeff8e65baadf1192b8c2c140b0d5396c",
+      "snapshot": {
+        "crates/card3d-engine/src/print.rs": "cea64589805604158619ca4c925854a5051d32c2b85fd8418543492740f95627"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Internal: print passes draw through Renderer::render_layers (one card).",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:crates/card3d-engine/src/scene.rs": {
+      "fingerprint": "3a6e7746b8f467747ea41325c538e6a0f17686e54e92a0a2d3531d6e40478fb9",
+      "snapshot": {
+        "crates/card3d-engine/src/scene.rs": "3c1dc1249bd7435dcf8da8e6de759cda4cdb63edd54309391a8c4d5f728cafe0"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Internal: scene shader modules, layouts and pipelines kept per device.",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:crates/card3d-engine/src/shine.rs": {
+      "fingerprint": "408ced3f935104f2ba36b9bea5a588c81677fb2bd11860d93b78c58018cf3771",
+      "snapshot": {
+        "crates/card3d-engine/src/shine.rs": "29f2bde08fa13ef1fd64eb1ab7f2524afff564327a07032eecc0ffcecad8b7af"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Internal: shine sprites and module kept per device.",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:crates/card3d-engine/src/vines.rs": {
+      "fingerprint": "6241f94a42f6ec9a4981f635d34c043ac33015341d0e771883c222d4f8976d88",
+      "snapshot": {
+        "crates/card3d-engine/src/vines.rs": "f831fd9bab4ff4dafd29fa2d4186b1d0e6d6cad151ee6d0abd3261264cea5805"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Internal: leaf atlas, module and mip pipeline kept per device.",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:crates/card3d-web/build-web.sh": {
+      "fingerprint": "0e27cd180bdb3ddf40367bc7de80dcd576bb802b22adb89f1b847cefb5a83be7",
+      "snapshot": {
+        "crates/card3d-web/build-web.sh": "4df8eb0eb073e48be3e75638fe14b03d7177d3d37529d1be35cd9160567acde5"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Build: runs split-preload.mjs so each package's split loader has preload(names) and card3d_web.js re-exports it. Package layout and file names unchanged (serving-and-csp stays accurate).",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:crates/card3d-web/split-preload.mjs": {
+      "fingerprint": "ef99c37d9fefa9109460137c712046206bc5ea59b8e2c8cb668592d965348fbe",
+      "snapshot": {
+        "crates/card3d-web/split-preload.mjs": "725d19183d89ea7adf362c4b6a302f670a274bce1ae8b9f728b9904fadcb3e55"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Build helper (new): adds preload(names) to the split loader. Nothing the skills describe.",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:crates/card3d-web/web/fallback.test.mjs": {
+      "fingerprint": "e653cd06c1f0f4d9add33bfd29baf3d5a998253657fea024710f8a8d23ec9860",
+      "snapshot": {
+        "crates/card3d-web/web/fallback.test.mjs": "6df9df2fa16fa255434ebcf91ffeb612299645d2aa640b0b613e2ff22bb239cf"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Test: a second card on the page shares the device and falls over with the first.",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:knip.jsonc": {
+      "fingerprint": "84950fe950f6aec24605384ad4c612cf1cf8b80aa3100004f279152fc967ffd1",
+      "snapshot": {
+        "knip.jsonc": "94d12c6f841d175d29f6d9645fc6c0010157fec38f5f03b9f1080f9908bbe655"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Repo config: split-preload.mjs is a knip entry.",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+      ]
+    },
+    "source:packages/core/src/engine-parts.test.ts": {
+      "fingerprint": "36487a114f39c0fe8d604ad5759d01c81d6fae2ea798f89630d6eaabf414f042",
+      "snapshot": {
+        "packages/core/src/engine-parts.test.ts": "35a0a8fecc17133f78b9a8b0f8e8a8086b7c96cfbdaf9ac840e844c4b40347a5"
+      },
+      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "outcome": "no-change",
+      "reason": "Test (new): engineParts names each feature's part.",
+      "evidence": [
+        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
+        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
+        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
+        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
       ]
     }
   }
