@@ -24,8 +24,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  // Software rendering is CPU-bound: a couple of workers is the sweet spot.
-  workers: process.env.E2E_WORKERS ? Number(process.env.E2E_WORKERS) : 2,
+  // Software rendering is CPU-bound: a couple of workers is the sweet spot on a laptop. CI's 4-vCPU
+  // runners take about as long in total with one, and each test then runs twice as fast.
+  workers: process.env.E2E_WORKERS ? Number(process.env.E2E_WORKERS) : process.env.CI ? 1 : 2,
   reporter: process.env.CI ? [["list"], ["github"]] : "list",
   use: {
     ...devices["Desktop Chrome"],

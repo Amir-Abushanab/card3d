@@ -7,7 +7,7 @@ interface MarqueeProbe {
 
 async function openShowcase(page: Page, query = ""): Promise<void> {
   await page.goto(`/showcase.html${query}`);
-  await page.waitForFunction(() => (window as unknown as MarqueeProbe).__marquee?.introPhase === "done", null, { timeout: 45_000 });
+  await page.waitForFunction(() => (window as unknown as MarqueeProbe).__marquee?.introPhase === "done", null, { timeout: 0 }); // bounded by the test's timeout
   await page.waitForTimeout(800);
 }
 
