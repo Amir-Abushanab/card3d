@@ -1,5 +1,13 @@
 # @card3d/react
 
+## 0.1.2
+
+### Patch Changes
+
+- [#4](https://github.com/Amir-Abushanab/card3d/pull/4) [`ee282f9`](https://github.com/Amir-Abushanab/card3d/commit/ee282f94808be4de47ae4d7a5671996bef9fef60) Thanks [@Amir-Abushanab](https://github.com/Amir-Abushanab)! - Faster, lighter cards: a page with several cards no longer mistakes its own WebGPU start for a crash (it used to download the WebGL build as well and record WebGPU as failed); the engine downloads while a design's fonts and images load; decoded images are shared between cards and rebuilds; paused cards stop decoding animated GIF stickers and listening on the window. The parts of the engine a design needs download together with the main module instead of one after another; on WebGPU a page's cards share one GPU device (pipelines, maps and environments made once for all of them; a lost device moves every card to the WebGL build); a card's shaders and pipelines are made while it is built and kept for the next card; the marquee draws its cards in one pass.
+- Updated dependencies [[`ee282f9`](https://github.com/Amir-Abushanab/card3d/commit/ee282f94808be4de47ae4d7a5671996bef9fef60)]:
+  - @card3d/element@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes

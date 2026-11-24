@@ -16,7 +16,7 @@ metadata:
   type: core
   domain: design-model
   library: "@card3d/core"
-  library_version: "0.1.1"
+  library_version: "0.1.2"
 sources:
   - src/types.ts
   - src/design/**
