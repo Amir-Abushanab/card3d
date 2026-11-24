@@ -118,24 +118,24 @@
       ]
     },
     "skill:packages/react/skills/metal-card-react/SKILL.md": {
-      "fingerprint": "966f18d9ff40770bfb965a7210fa8ea421451a145a04a611eaced52e1301758f",
+      "fingerprint": "599dccf7a0a817e61cf6cf7fd3cd057485fe3395bd2be55e12bd2544eb97a445",
       "snapshot": {
         "packages/react/README.md": "9643c03677036a1ef6315b4a4bde8c864b1ed541c0e4f68fce3c31b4f0764553",
-        "packages/react/skills/metal-card-react/SKILL.md": "3d86ec30fdbaa0d13f2a0d5e7fd8251034d63a503e32f9f1bcbe74c35e7bd871",
-        "packages/react/src/index.tsx": "a985949224b47db69666e4d3cf6e6030a9443c513110e32fd27b2e494529367a"
+        "packages/react/skills/metal-card-react/SKILL.md": "a4719f33372b0b691dbe8c93b48742c452586288f861869919e21e00e7064dca",
+        "packages/react/src/index.tsx": "893632751ea4765bd9b8f43a92146fc9d1fbeb60c2a25a2d493a6909930d7f7b"
       },
-      "head": "882d223dfc57bb0332f7e541af2357bab3c30fb9",
+      "head": "1c1dfa832a03f4ccd11c103c108f17917ddf0e1b",
       "outcome": "updated",
-      "reason": "Rebased onto 0.1.1: the skills' library_version moved to 0.1.1 on main (the Version PR), on top of this branch's already-reviewed guidance updates (engine-stage: when the engine downloads, parts prefetched together, WebGPU stages share a device; metal-card-react: a design object edited in place isn't re-read; stage-api: what setPaused stops). Planning records already carry those entries.",
+      "reason": "Reverted the MetalCard in-place-edit change before release: metal-card-react's common-mistakes entry is back to 0.1.1's text, and domain_map's in-place failure mode is removed; skill_spec records the revert.",
       "evidence": [
-        "Changed: packages/react/skills/metal-card-react/SKILL.md at 882d223dfc57bb0332f7e541af2357bab3c30fb9"
+        "Changed: packages/react/skills/metal-card-react/SKILL.md, packages/react/src/index.tsx at 1c1dfa832a03f4ccd11c103c108f17917ddf0e1b"
       ]
     },
     "planning:_artifacts": {
-      "fingerprint": "92087b5f4605c885fce6eb0e5f8343807aeb61aba706d096af28b20d569a5937",
+      "fingerprint": "3e8f78a37611cfb4de3a3d5b06e285fe420f306ed0169d1745ed9886ba058847",
       "snapshot": {
-        "_artifacts/domain_map.yaml": "c589256bfa75937f3bfcf2729393162193f647ef7248de8f5abbbf2c7c522933",
-        "_artifacts/skill_spec.md": "cc44e1bbe51f04c267aed6d933865cd65e6d3514ac63a89a70033285c92d0663",
+        "_artifacts/domain_map.yaml": "24e71bddb27d9062281edc272ea031a11b327e1b93a56b6d19fb5778a19900e4",
+        "_artifacts/skill_spec.md": "21c18f94e722e4d846cfae5a89ae93737e8efed989b20ea42fff258039a40897",
         "_artifacts/skill_tree.yaml": "04deb73aae2cfa86616f2b7102e843789e7fe663ffcc643658832f2d9b81256e",
         "crates/card3d-engine/shaders/face/prelude.wgsl": "63c27f150678f7e40847a7ccaaf1b7eeeafba44dc60c91425bb2759a6c3f20fb",
         "crates/card3d-engine/src/face_custom.rs": "ce8eee2c04f4f92c3b788981a34f8c9431a116c45f127c51c89f9ac24e5cd270",
@@ -208,14 +208,14 @@
         "packages/element/src/standalone.ts": "546e056b32e3473d013e960257cf7f7bfe95a4a1e787052666f13466b527447e",
         "packages/element/vite.standalone.config.ts": "a9fe104bea21327fa38d1cb97ed7676ad851bd8d24a9257dbb076985f821299b",
         "packages/react/README.md": "9643c03677036a1ef6315b4a4bde8c864b1ed541c0e4f68fce3c31b4f0764553",
-        "packages/react/skills/metal-card-react/SKILL.md": "3d86ec30fdbaa0d13f2a0d5e7fd8251034d63a503e32f9f1bcbe74c35e7bd871",
-        "packages/react/src/index.tsx": "a985949224b47db69666e4d3cf6e6030a9443c513110e32fd27b2e494529367a"
+        "packages/react/skills/metal-card-react/SKILL.md": "a4719f33372b0b691dbe8c93b48742c452586288f861869919e21e00e7064dca",
+        "packages/react/src/index.tsx": "893632751ea4765bd9b8f43a92146fc9d1fbeb60c2a25a2d493a6909930d7f7b"
       },
-      "head": "882d223dfc57bb0332f7e541af2357bab3c30fb9",
+      "head": "1c1dfa832a03f4ccd11c103c108f17917ddf0e1b",
       "outcome": "updated",
-      "reason": "Rebased onto 0.1.1: the skills' library_version moved to 0.1.1 on main (the Version PR), on top of this branch's already-reviewed guidance updates (engine-stage: when the engine downloads, parts prefetched together, WebGPU stages share a device; metal-card-react: a design object edited in place isn't re-read; stage-api: what setPaused stops). Planning records already carry those entries.",
+      "reason": "Reverted the MetalCard in-place-edit change before release: metal-card-react's common-mistakes entry is back to 0.1.1's text, and domain_map's in-place failure mode is removed; skill_spec records the revert.",
       "evidence": [
-        "Changed: packages/core/skills/card-design-json/SKILL.md, packages/core/skills/custom-face-shaders-wgsl/SKILL.md, packages/core/skills/engine-stage/SKILL.md, packages/element/skills/embed-metal-card/SKILL.md, packages/react/skills/metal-card-react/SKILL.md at 882d223dfc57bb0332f7e541af2357bab3c30fb9"
+        "Changed: _artifacts/domain_map.yaml, _artifacts/skill_spec.md, packages/react/skills/metal-card-react/SKILL.md, packages/react/src/index.tsx at 1c1dfa832a03f4ccd11c103c108f17917ddf0e1b"
       ]
     },
     "source:crates/card3d-engine/shaders/liquid-metal.wgsl": {
