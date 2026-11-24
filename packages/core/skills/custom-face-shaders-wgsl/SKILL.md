@@ -15,7 +15,7 @@ metadata:
   type: core
   domain: face-shaders
   library: "@card3d/core"
-  library_version: "0.1.1"
+  library_version: "0.1.2"
 requires:
   - card-design-json
 sources:

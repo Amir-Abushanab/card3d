@@ -15,7 +15,7 @@ metadata:
   type: core
   domain: embedding
   library: "@card3d/element"
-  library_version: "0.1.1"
+  library_version: "0.1.2"
 sources:
   - src/**
   - README.md

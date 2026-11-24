@@ -15,7 +15,7 @@ metadata:
   framework: react
   domain: embedding
   library: "@card3d/react"
-  library_version: "0.1.1"
+  library_version: "0.1.2"
 requires:
   - "@card3d/element#embed-metal-card"
 sources:
