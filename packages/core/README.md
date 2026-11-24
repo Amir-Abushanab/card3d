@@ -75,7 +75,8 @@ await stage.setDesign(
 The engine ships in `wasm/`: the loader (`loader.js`) and the two builds (`pkg/` for WebGPU, about
 166 KB gzipped for its main module; `pkg-webgl/`, 793 KB). A page downloads one of them, and each
 optional part of a card (holo foils, stickers, shaped bodies, edges, finished marks, glass, face shaders,
-add-ons, scenes, the marquee, print and AR) only when a design uses it. `dist/engine.js`
+add-ons, scenes, the marquee, print and AR) only when a design uses it, the parts a design needs all
+together as it is set. `dist/engine.js`
 imports `../wasm/loader.js`, and the loader imports each build by a literal path, so bundlers emit the
 files as assets of your build. Serve `.wasm` as `application/wasm` (faster start). Every file except
 `card3d_web.js` has a content hash in its name: cache those for long, and keep the previous build's

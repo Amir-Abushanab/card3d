@@ -5,10 +5,11 @@
 # (beside the loader, packages/core/wasm/loader.js, and shipped with @card3d/core)
 # Each package is a main module plus lazily loaded chunks, one per `#[wasm_split(name)]` split point
 # (split_<name>.wasm; chunk_<n>.wasm holds code that several of them share). A page downloads a chunk
-# the first time a design needs it.
+# the first time a design needs it, or earlier: the package's `preload(names)` starts the named parts'
+# downloads (split-preload.mjs), which the page does with the main module's for the design it shows.
 # Needs: rustup target add wasm32-unknown-unknown; cargo install wasm-bindgen-cli --version 0.2.130;
 # cargo install wasm_split_cli_support --version 0.2.5 --features build-binary --locked; wasm-opt
-# (binaryen). The wasm link keeps relocations for the splitter (.cargo/config.toml).
+# (binaryen); Node. The wasm link keeps relocations for the splitter (.cargo/config.toml).
 # Every file but the entry, <pkg>/card3d_web.js, carries a content hash in its name (fingerprint).
 # Size budgets (gzip -9 bytes of the main module) fail the build when exceeded: raise them on purpose.
 set -e
@@ -66,6 +67,8 @@ fingerprint() {
     echo "error: __wasm_split.js still streams (wasm-split's loader changed?)" >&2
     exit 1
   fi
+  # `preload(names)`: the page starts downloading the parts a design needs with the main module.
+  node split-preload.mjs "$1"
   for f in "$1"/split_*.wasm "$1"/chunk_*.wasm; do
     [ -e "$f" ] && rename "$1" "${f##*/}" __wasm_split.js
   done
@@ -73,7 +76,8 @@ fingerprint() {
   base=__wasm_split.js
   new="__wasm_split.$(hash "$1/$base").js"
   mv "$1/$base" "$1/$new"
-  sed -i.bak "s#^import \* as \(import[0-9]*\) from \"\./__wasm_split\.js\"#import * as \1 from \"./$new\"#" "$1/card3d_web.js" && rm "$1/card3d_web.js.bak"
+  sed -i.bak -e "s#^import \* as \(import[0-9]*\) from \"\./__wasm_split\.js\"#import * as \1 from \"./$new\"#" \
+    -e "s#^export { preload } from \"\./__wasm_split\.js\"#export { preload } from \"./$new\"#" "$1/card3d_web.js" && rm "$1/card3d_web.js.bak"
   main="card3d_web_bg.$(hash "$1/card3d_web_bg.wasm").wasm"
   mv "$1/card3d_web_bg.wasm" "$1/$main"
   sed -i.bak "s#new URL('card3d_web_bg\.wasm', import\.meta\.url)#new URL('$main', import.meta.url)#" "$1/card3d_web.js" && rm "$1/card3d_web.js.bak"

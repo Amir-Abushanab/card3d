@@ -215,7 +215,7 @@ fn buffer_passes(r: &mut Renderer, device: &wgpu::Device, queue: &wgpu::Queue, f
     let set_side = |r: &mut Renderer, i: usize, side: Side| {
         let g = r.gpu_items[i].as_mut().unwrap();
         g.uniform.spec[1] = crate::renderer::side_mode(side);
-        queue.write_buffer(&g.buffer, 0, bytemuck::bytes_of(&g.uniform));
+        r.write_item(queue, i);
     };
     let g = r.items[gi].material.glass.unwrap();
     // Which face the camera is on, in the glass's own space (`placedObjects`).
@@ -256,7 +256,7 @@ fn buffer_passes(r: &mut Renderer, device: &wgpu::Device, queue: &wgpu::Queue, f
     // The scene's reflection again, now with the glass.
     if let Some(p) = passes.as_mut() {
         p.run(r, device, queue, &f.pass_frame, PassStage::AfterGlass);
-        r.write_items(device, queue, f.view, slot);
+        r.write_items(device, queue, f.view, slot, true);
         for e in &r.eyes {
             e.write(queue, slot, &f.pass_frame.camera);
         }

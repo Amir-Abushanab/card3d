@@ -134,8 +134,9 @@ pub fn build(r: &mut crate::renderer::Renderer, device: &wgpu::Device, recipe: &
         if sign < 0.0 {
             t *= Mat4::from_rotation_y(std::f32::consts::PI);
         }
-        r.add_holo(device, holo_face, t, crate::renderer::HoloDraw { values, edge_only: false, edge_side: 1.0 });
-        r.add_holo(device, holo_edge, Mat4::IDENTITY, crate::renderer::HoloDraw { values, edge_only: true, edge_side: sign });
+        let front = sign > 0.0;
+        r.add_holo(device, holo_face, t, crate::renderer::HoloDraw { values, edge_only: false, edge_side: 1.0, front });
+        r.add_holo(device, holo_edge, Mat4::IDENTITY, crate::renderer::HoloDraw { values, edge_only: true, edge_side: sign, front });
     }
     Ok(())
 }

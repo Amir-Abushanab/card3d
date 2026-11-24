@@ -2,7 +2,9 @@
 //! WebGL 2 fallback for browsers without WebGPU. `CardStage` is the engine's stage
 //! (`card3d_engine::stage`) or the marquee (`card3d_engine::marquee`: many cards in one frame) on a
 //! canvas; the page owns the frame loop, input listeners and sizing (packages/core/wasm/loader.js,
-//! marquee.js), and forwards them. Textures and text are drawn by the browser's Canvas 2D.
+//! marquee.js), and forwards them. Textures and text are drawn by the browser's Canvas 2D. On the
+//! WebGPU build every view on the page draws with one device (`page`); the WebGL build has a device
+//! per canvas.
 //!
 //! The binding is small on purpose (it is in every page's main module): numbers go through one
 //! `call` (operation codes below, mirrored by the page's facades), strings out through `text`, and
@@ -10,6 +12,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
+use card3d_engine::card::BuildKey;
 use card3d_engine::interaction::{CardRotation, InteractionEvent};
 use card3d_engine::marquee::Marquee;
 use card3d_engine::quality::Quality;
@@ -98,6 +101,25 @@ mod build {
     pub(crate) const PRINT: u32 = 2;
     pub(crate) const AR: u32 = 3;
     pub(crate) const CHECK: u32 = 4;
+}
+
+/// What a build's images (`CardStage::build`) say about the card besides the design (`BuildKey`): the
+/// keys of the decoded files, which a key's source names (one source, one file), and the strings
+/// whole (the name font's family), sorted (the loader adds them as they load).
+fn assets(images: Option<&js_sys::Map>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    if let Some(m) = images {
+        m.for_each(&mut |v, k| {
+            let k = k.as_string().unwrap_or_default();
+            let entry = match v.as_string() {
+                Some(v) => k + "=" + &v,
+                None => k,
+            };
+            // A few entries: inserted in order (smaller code than a sort).
+            out.insert(out.partition_point(|e| *e < entry), entry);
+        });
+    }
+    out
 }
 
 /// `CardStage.mcall` operations on a card's stage (the marquee has its own, `marquee::op`).
@@ -201,7 +223,7 @@ impl CardStage {
                 default_rotation: CardRotation { x: if o(6).is_nan() { 0.0 } else { o(6) }, y: if o(7).is_nan() { 0.0 } else { o(7) } },
             }))
         };
-        Ok(CardStage { gpu: Rc::new(gpu), view: Rc::new(RefCell::new(View { surface, config, scene })), failure, latest: Rc::new(Cell::new(0)) })
+        Ok(CardStage { gpu, view: Rc::new(RefCell::new(View { surface, config, scene })), failure, latest: Rc::new(Cell::new(0)) })
     }
 }
 
@@ -240,18 +262,21 @@ impl PrintJob {
     }
 }
 
-/// Starts the GPU on `canvas` (sized by the page, device pixels): the device, the configured surface,
-/// and the failure the device reports.
-async fn start(canvas: web_sys::HtmlCanvasElement) -> Result<(Gpu, wgpu::Surface<'static>, wgpu::SurfaceConfiguration, Failure), JsValue> {
-    console_error_panic_hook::set_once();
+/// A GPU device, what made it, and the failure it reports: on the WebGPU build the page's one (`page`),
+/// on the WebGL build each canvas's own (a WebGL context belongs to its canvas).
+struct Device {
+    #[cfg(not(feature = "webgl"))]
+    instance: wgpu::Instance,
+    adapter: wgpu::Adapter,
+    gpu: Rc<Gpu>,
+    failure: Failure,
+}
+
+/// A device on `instance` (for `surface`'s canvas on the WebGL build) with the canvas format the
+/// engine draws in.
+async fn open(instance: wgpu::Instance, surface: Option<&wgpu::Surface<'static>>) -> Result<Device, JsValue> {
     let err = |e: &dyn std::fmt::Display| JsValue::from_str(&e.to_string());
-    let (width, height) = (canvas.width().max(1), canvas.height().max(1));
-    let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
-    desc.backends = if cfg!(feature = "webgl") { wgpu::Backends::GL } else { wgpu::Backends::BROWSER_WEBGPU };
-    let instance = wgpu::Instance::new(desc);
-    let surface = instance.create_surface(wgpu::SurfaceTarget::Canvas(canvas)).map_err(|e| err(&e))?;
-    let adapter =
-        instance.request_adapter(&wgpu::RequestAdapterOptions { compatible_surface: Some(&surface), ..Default::default() }).await.map_err(|e| err(&e))?;
+    let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions { compatible_surface: surface, ..Default::default() }).await.map_err(|e| err(&e))?;
     // WebGL 2 cannot meet WebGPU's default limits (no compute, fewer bindings).
     let required_limits =
         if cfg!(feature = "webgl") { wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits()) } else { wgpu::Limits::default() };
@@ -262,9 +287,98 @@ async fn start(canvas: web_sys::HtmlCanvasElement) -> Result<(Gpu, wgpu::Surface
     device.set_device_lost_callback(move |reason, message| lost.set(format!("device lost ({reason:?}): {message}")));
     let errors = failure.clone();
     device.on_uncaptured_error(Arc::new(move |e| errors.set(format!("GPU error: {e}"))));
-    let caps = surface.get_capabilities(&adapter);
-    // The shader writes sRGB-encoded colour itself (as three does), so the target must not be sRGB.
-    let format = caps.formats.iter().copied().find(|f| !f.is_srgb()).ok_or("no non-sRGB surface format")?;
+    // The shader writes sRGB-encoded colour itself (as three does), so the target must not be sRGB: a
+    // WebGPU canvas's preferred format (what its capabilities list first) never is.
+    #[cfg(feature = "webgl")]
+    let format = surface.and_then(|s| s.get_capabilities(&adapter).formats.iter().copied().find(|f| !f.is_srgb()));
+    #[cfg(not(feature = "webgl"))]
+    let format = Some(preferred_format());
+    let format = format.ok_or("no non-sRGB surface format")?;
+    #[cfg(feature = "webgl")]
+    drop(instance);
+    Ok(Device {
+        #[cfg(not(feature = "webgl"))]
+        instance,
+        adapter,
+        gpu: Rc::new(Gpu { device, queue, format }),
+        failure,
+    })
+}
+
+/// `navigator.gpu.getPreferredCanvasFormat()`: "rgba8unorm" or "bgra8unorm".
+#[cfg(not(feature = "webgl"))]
+fn preferred_format() -> wgpu::TextureFormat {
+    use wasm_bindgen::JsCast;
+    let get = |o: &JsValue, k: &str| js_sys::Reflect::get(o, &JsValue::from_str(k)).ok();
+    let gpu = get(&js_sys::global(), "navigator").and_then(|n| get(&n, "gpu"));
+    let preferred = gpu.and_then(|g| get(&g, "getPreferredCanvasFormat")?.dyn_into::<js_sys::Function>().ok()?.call0(&g).ok());
+    match preferred.and_then(|f| f.as_string()).as_deref() {
+        Some("rgba8unorm") => wgpu::TextureFormat::Rgba8Unorm,
+        _ => wgpu::TextureFormat::Bgra8Unorm,
+    }
+}
+
+#[cfg(not(feature = "webgl"))]
+thread_local! {
+    /// The page's WebGPU device: every view draws with it, each canvas through its own surface, so the
+    /// cards share what the engine keeps per device (pipelines, maps, environments). A lost device
+    /// fails every view on it (the page moves each one to the WebGL build); the next view to start
+    /// asks for a new one.
+    static PAGE: RefCell<Option<Rc<Device>>> = const { RefCell::new(None) };
+    /// The device being asked for: views starting meanwhile wait for it.
+    static STARTING: RefCell<Option<js_sys::Promise>> = const { RefCell::new(None) };
+}
+
+/// The page's WebGPU device (`PAGE`), asked for once.
+#[cfg(not(feature = "webgl"))]
+async fn page() -> Result<Rc<Device>, JsValue> {
+    if let Some(d) = PAGE.with_borrow(Clone::clone).filter(|d| d.failure.get().is_none()) {
+        return Ok(d);
+    }
+    let promise = match STARTING.with_borrow(Clone::clone) {
+        Some(p) => p,
+        None => {
+            let p = wasm_bindgen_futures::future_to_promise(async {
+                let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
+                desc.backends = wgpu::Backends::BROWSER_WEBGPU;
+                let device = open(wgpu::Instance::new(desc), None).await;
+                STARTING.set(None);
+                PAGE.set(Some(Rc::new(device?)));
+                Ok(JsValue::UNDEFINED)
+            });
+            STARTING.set(Some(p.clone()));
+            p
+        }
+    };
+    wasm_bindgen_futures::JsFuture::from(promise).await?;
+    PAGE.with_borrow(Clone::clone).ok_or_else(|| JsValue::from_str("no WebGPU device"))
+}
+
+/// Starts the GPU on `canvas` (sized by the page, device pixels): the device (`Device`), the canvas's
+/// configured surface, and the failure the device reports.
+async fn start(canvas: web_sys::HtmlCanvasElement) -> Result<(Rc<Gpu>, wgpu::Surface<'static>, wgpu::SurfaceConfiguration, Failure), JsValue> {
+    console_error_panic_hook::set_once();
+    let err = |e: &dyn std::fmt::Display| JsValue::from_str(&e.to_string());
+    let (width, height) = (canvas.width().max(1), canvas.height().max(1));
+    #[cfg(not(feature = "webgl"))]
+    let (device, surface) = {
+        let device = page().await?;
+        let surface = device.instance.create_surface(wgpu::SurfaceTarget::Canvas(canvas)).map_err(|e| err(&e))?;
+        (device, surface)
+    };
+    #[cfg(feature = "webgl")]
+    let (device, surface) = {
+        let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
+        desc.backends = wgpu::Backends::GL;
+        let instance = wgpu::Instance::new(desc);
+        let surface = instance.create_surface(wgpu::SurfaceTarget::Canvas(canvas)).map_err(|e| err(&e))?;
+        (Rc::new(open(instance, Some(&surface)).await?), surface)
+    };
+    let caps = surface.get_capabilities(&device.adapter);
+    let format = device.gpu.format;
+    if !caps.formats.contains(&format) {
+        return Err(JsValue::from_str("the canvas can't take the device's format"));
+    }
     let alpha_mode =
         if caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) { wgpu::CompositeAlphaMode::PreMultiplied } else { caps.alpha_modes[0] };
     let config = wgpu::SurfaceConfiguration {
@@ -278,11 +392,11 @@ async fn start(canvas: web_sys::HtmlCanvasElement) -> Result<(Gpu, wgpu::Surface
         view_formats: vec![],
         color_space: wgpu::SurfaceColorSpace::Auto,
     };
-    surface.configure(&device, &config);
-    if let Some(f) = failure.get() {
+    surface.configure(&device.gpu.device, &config);
+    if let Some(f) = device.failure.get() {
         return Err(JsValue::from_str(&f));
     }
-    Ok((Gpu { device, queue, format }, surface, config, failure))
+    Ok((device.gpu.clone(), surface, config, device.failure.clone()))
 }
 
 #[wasm_bindgen]
@@ -311,7 +425,8 @@ impl CardStage {
                 let errors = card3d_engine::face_shaders::check_custom(&gpu.device, design).await.map_err(load_error)?;
                 return Ok(JsValue::from_str(&errors));
             }
-            let design = CardDesign::from_json(&design).map_err(|e| JsValue::from_str(&e))?;
+            let doc = card3d_engine::json::parse(&design).map_err(|e| JsValue::from_str(&format!("card design: {e}")))?;
+            let design = CardDesign::from_value(&doc).map_err(|e| JsValue::from_str(&e))?;
             let (options, format) = match kind {
                 build::PRINT | build::AR => (
                     CardOptions { quality: Quality::Full, custom_font_family: font_family, print: true, ..Default::default() },
@@ -326,6 +441,17 @@ impl CardStage {
                     (options, gpu.format)
                 }
             };
+            // The stage's card takes a design that differs from its own only in values it can change in
+            // place (`Stage::retune`) without a build.
+            let key = (kind == build::DESIGN).then(|| BuildKey::new(doc, &options, assets(images.as_ref()))).flatten();
+            if let (Some(key), Scene::Card(s)) = (&key, &mut view.borrow_mut().scene) {
+                if latest.get() != mine {
+                    return Ok(JsValue::FALSE);
+                }
+                if failure.get().is_none() && s.retune(key, &design) {
+                    return Ok(JsValue::TRUE);
+                }
+            }
             let card = CardRenderer::new(&gpu.device, &gpu.queue, format, &design, &BrowserHost { images }, &options).await;
             if let Some(f) = failure.get() {
                 return Err(JsValue::from_str(&f));
@@ -349,7 +475,10 @@ impl CardStage {
             }
             Ok(JsValue::from_bool(match &mut view.borrow_mut().scene {
                 Scene::Card(s) if kind == build::DESIGN && latest.get() == mine => {
-                    s.install(card);
+                    match key {
+                        Some(key) => s.install_keyed(card, key),
+                        None => s.install(card),
+                    }
                     true
                 }
                 Scene::Marquee(m) if kind == build::SLOT => m.install(a as usize, b as u32, card),
@@ -445,7 +574,8 @@ impl CardStage {
             }
             // Checks on the GPU's work (readbacks arrive on a poll on the WebGL build).
             op::POLL => drop(gpu.device.poll(wgpu::PollType::Poll)),
-            // Testing only: destroys the device, as a driver crash or a GPU reset would.
+            // Testing only: destroys the device (on the WebGPU build the page's, every view's), as a
+            // driver crash or a GPU reset would.
             op::SIMULATE_DEVICE_LOSS => gpu.device.destroy(),
             _ => {
                 let aspect = v.config.width as f64 / v.config.height.max(1) as f64;

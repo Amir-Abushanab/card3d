@@ -5,7 +5,6 @@
  */
 import { paintLightingBackdrop, type CardDesign, type LightingPresetId } from "@card3d/core/model";
 import { cameraPathPose, cameraPathTime, getCameraPath, type CameraEasing, type CameraPathId } from "@card3d/core/engine";
-import { GIFEncoder, applyPalette, quantize } from "gifenc";
 import { canvasToBlob, downloadBlob, downloadText } from "../ui/dom.ts";
 import { toRecipeSpec } from "../state/design.ts";
 import { rotationQuaternion, type CaptureStage, type FrameOptions, type Quat } from "./offscreen.ts";
@@ -334,6 +333,8 @@ async function exportGif(off: CaptureStage, design: CardDesign, out: OutputSetti
   scratch.width = w;
   scratch.height = h;
   const ctx = scratch.getContext("2d", { willReadFrequently: true })!;
+  // The encoder loads with the first GIF export.
+  const { GIFEncoder, applyPalette, quantize } = await import("gifenc");
   const gif = GIFEncoder();
   // One shared palette (sampled from a few poses) keeps colours stable frame to frame: no shimmer.
   let palette: number[][] | null = null;

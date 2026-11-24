@@ -277,11 +277,15 @@ pub struct CardDesign {
 
 impl CardDesign {
     pub fn from_json(text: &str) -> Result<CardDesign, String> {
-        let v = json::parse(text).map_err(|e| format!("card design: {e}"))?;
+        Self::from_value(&json::parse(text).map_err(|e| format!("card design: {e}"))?)
+    }
+
+    /// `from_json` for JSON already parsed.
+    pub fn from_value(v: &Value) -> Result<CardDesign, String> {
         if v.as_object().is_none() {
             return Err("card design: expected an object".into());
         }
-        Ok(Self::read(&v))
+        Ok(Self::read(v))
     }
 
     pub fn read(v: &Value) -> Self {

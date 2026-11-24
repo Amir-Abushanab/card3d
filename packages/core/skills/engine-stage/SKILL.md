@@ -33,8 +33,9 @@ sources:
 
 The engine is Rust on wgpu, shipped as two wasm builds: WebGPU, and WebGL 2 for browsers without it.
 A page downloads one build (about 166 KB gzipped for the WebGPU main module, 793 KB for WebGL 2) and
-each optional part of a card (holo, stickers, shapes, shaders, effects, scenes, AR, print) the first
-time a design uses it. Read card-design-json for the designs it draws. If a drop-in card is enough,
+the optional parts of a card (holo, stickers, shapes, shaders, effects, scenes, AR, print) a design uses,
+all together as the design is set. The download starts when the first stage is created, while the
+design's fonts and images load: create the stage as early as the page knows it will show a card. Read card-design-json for the designs it draws. If a drop-in card is enough,
 `<metal-card>` (embed-metal-card) does all of this for you.
 
 ## Setup
@@ -102,7 +103,8 @@ thumbnails (`createOffscreenStage`, deterministic clocks), video frames along `C
 ## Many cards, the marquee and asset providers
 
 - Each stage holds its own GPU context; browsers allow a page about 16 WebGL contexts and drop the
-  oldest past that. For more than a few cards use `<metal-card>` (it pools contexts, 12 by default) or
+  oldest past that. On WebGPU the page's stages share one device, so a lost device moves all of them
+  to the WebGL build at once. For more than a few cards use `<metal-card>` (it pools contexts, 12 by default) or
   the marquee, which draws many cards on one canvas:
 
 ```ts

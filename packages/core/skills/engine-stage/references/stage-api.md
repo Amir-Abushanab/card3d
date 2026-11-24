@@ -32,7 +32,7 @@ the DOM), `onFallback(why)`, `onContextLost()`, `onContextRestored()` (rebuilt i
 | `flip()`, `reset()` | turn over; back to the rest pose |
 | `interaction` | `{ rot, flipped, setRotation, toggleFlip, setFlipped, reset, setActive, restore, setLabel }`, or null |
 | `setQuality(q)` (async), `setFit(f)`, `fit` | |
-| `setPaused(p)`, `paused` | stop rendering and clocks (also automatic in hidden tabs) |
+| `setPaused(p)`, `paused` | stop rendering and clocks, animated GIF stickers and the window listeners live liquid metal uses (also automatic in hidden tabs) |
 | `render()`, `invalidate()` | draw now; schedule one coalesced frame |
 | `animated` | the card moves by itself now (live shaders, add-ons, a flip) |
 | `setRotation([x, y, z])` | radians, Euler XYZ, on the card's slot (camera paths); independent of the interaction |

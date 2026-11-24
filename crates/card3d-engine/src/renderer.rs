@@ -175,11 +175,13 @@ pub struct DecalLook {
 }
 
 /// A holo foil draw (`holo/`): one side's values, and whether it is the bevel foil (with its side).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct HoloDraw {
     pub values: crate::holo::HoloValues,
     pub edge_only: bool,
     pub edge_side: f32,
+    /// The front's foil, else the back's (`CardRenderer::retune` sets each side's values).
+    pub front: bool,
 }
 
 #[repr(C)]
@@ -393,7 +395,7 @@ pub struct Item {
 }
 
 pub(crate) struct GpuItem {
-    pub(crate) buffer: wgpu::Buffer,
+    /// Bound at the item's slot of the renderer's uniform buffer (`Renderer::uniforms`).
     bind_group: wgpu::BindGroup,
     pub(crate) uniform: MaterialUniform,
     key: PipelineKey,
@@ -434,7 +436,7 @@ impl Core {
         });
         let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("draw"),
-            entries: &[uniform_entry(0), texture_entry(1), texture_entry(2), texture_entry(3), texture_entry(4), sampler_entry(5), sampler_entry(6)],
+            entries: &[slot_entry(0), texture_entry(1), texture_entry(2), texture_entry(3), texture_entry(4), sampler_entry(5), sampler_entry(6)],
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
@@ -468,7 +470,7 @@ impl Shared {
         quality: crate::quality::Quality,
     ) -> Shared {
         let env_size = env::EnvSize::new(quality.preset().environment_resolution);
-        Shared { core: Rc::new(Core::new(device, format, env_size)), atlas: env::build_environment(device, queue, look, quality, None) }
+        Shared { core: core(device, format, env_size), atlas: env::build_environment(device, queue, look, quality, None) }
     }
 
     /// The same core with another environment of the same size (a lighting preset's).
@@ -524,8 +526,114 @@ fn core(device: &wgpu::Device, format: wgpu::TextureFormat, size: env::EnvSize) 
     })
 }
 
-/// The canvas's multisampled colour and depth, shared by renderers that draw one frame in turn
-/// (`Renderer::render_layer`), with the frame's projection.
+/// A value `memo` made: its kind, its key, the value.
+type Made = (&'static str, u64, Rc<dyn std::any::Any>);
+
+/// A studio environment's inputs (`Environment::Studio`).
+type StudioKey = (Option<env::Look>, crate::quality::Quality, Option<[f32; 3]>);
+
+/// What the cards made on a device keep for the next card made on it: a stage builds the next card
+/// while the last is still shown (Card Studio builds one on every panel change), and finds the maps
+/// (`MapCache`) and the studio environments it needs made. It lives while a card made on the device
+/// does (`DEVICE_CACHES`).
+#[derive(Default)]
+pub(crate) struct DeviceCache {
+    maps: Rc<crate::card::MapCache>,
+    /// The last two studio environments made, the latest last.
+    studio: RefCell<Vec<(StudioKey, wgpu::Texture)>>,
+    /// What `memo` made, by kind and key, the latest used last.
+    made: RefCell<Vec<Made>>,
+}
+
+thread_local! {
+    /// Each device's cache (by address, as `CORES`), while a card made on it lives.
+    static DEVICE_CACHES: RefCell<Vec<(usize, std::rc::Weak<DeviceCache>)>> = const { RefCell::new(Vec::new()) };
+}
+
+/// The cache of `device` (`DEVICE_CACHES`).
+fn device_cache(device: &wgpu::Device) -> Rc<DeviceCache> {
+    let at = std::ptr::from_ref::<wgpu::Device>(device) as usize;
+    DEVICE_CACHES.with_borrow_mut(|caches| {
+        caches.retain(|e| e.1.strong_count() > 0);
+        if let Some(cache) = caches.iter().find(|e| e.0 == at).and_then(|e| e.1.upgrade()) {
+            return cache;
+        }
+        let cache = Rc::new(DeviceCache::default());
+        caches.push((at, Rc::downgrade(&cache)));
+        cache
+    })
+}
+
+impl DeviceCache {
+    /// The studio environment for `key`, made once (each compiles its shaders, renders a cube and
+    /// prefilters it).
+    fn studio(&self, device: &wgpu::Device, queue: &wgpu::Queue, key: StudioKey) -> wgpu::Texture {
+        let mut made = self.studio.borrow_mut();
+        let atlas = match made.iter().position(|e| e.0 == key) {
+            Some(i) => made.remove(i).1,
+            None => env::build_environment(device, queue, key.0.as_ref(), key.1, key.2),
+        };
+        made.push((key, atlas.clone()));
+        if made.len() > 2 {
+            made.remove(0);
+        }
+        atlas
+    }
+
+    fn get(&self, kind: &'static str, key: u64) -> Option<Rc<dyn std::any::Any>> {
+        let mut made = self.made.borrow_mut();
+        let i = made.iter().position(|e| e.0 == kind && e.1 == key)?;
+        let e = made.remove(i);
+        let value = e.2.clone();
+        made.push(e);
+        Some(value)
+    }
+
+    fn put(&self, kind: &'static str, keep: usize, key: u64, value: Rc<dyn std::any::Any>) {
+        let mut made = self.made.borrow_mut();
+        made.retain(|e| e.0 != kind || e.1 != key);
+        made.push((kind, key, value));
+        if made.iter().filter(|e| e.0 == kind).count() > keep {
+            let oldest = made.iter().position(|e| e.0 == kind).unwrap();
+            made.remove(oldest);
+        }
+    }
+}
+
+/// A `memo` key: the hash of what a value is made from (GPU objects hash by identity).
+pub(crate) fn key_of(of: impl std::hash::Hash) -> u64 {
+    use std::hash::Hasher;
+    let mut h = std::hash::DefaultHasher::new();
+    of.hash(&mut h);
+    h.finish()
+}
+
+/// What `make` makes from `key` (`key_of` its inputs) on `device`, made once while a card made on the
+/// device lives (`DeviceCache`; the next card is built while the last is shown): shader modules and
+/// pipelines (compiled once instead of per card; WebGL links its programs per module), and what
+/// effects draw from fixed inputs. The `keep` latest used of a `kind` stay. A value holding GPU objects
+/// its key hashes by identity keeps them too, so their identities aren't reused while it's kept.
+pub(crate) fn memo<T: 'static>(device: &wgpu::Device, kind: &'static str, keep: usize, key: u64, make: impl FnOnce() -> T) -> Rc<T> {
+    if let Some(v) = cached(device, kind, key) {
+        return v;
+    }
+    let v = Rc::new(make());
+    remember(device, kind, keep, key, v.clone());
+    v
+}
+
+/// `memo`'s value for `key`, if it has one.
+pub(crate) fn cached<T: 'static>(device: &wgpu::Device, kind: &'static str, key: u64) -> Option<Rc<T>> {
+    device_cache(device).get(kind, key).and_then(|v| v.downcast::<T>().ok())
+}
+
+/// Keeps `value` as `memo`'s for `key` (made apart: a custom shader is kept once it compiled).
+pub(crate) fn remember<T: 'static>(device: &wgpu::Device, kind: &'static str, keep: usize, key: u64, value: Rc<T>) {
+    device_cache(device).put(kind, keep, key, value);
+}
+
+/// The canvas's multisampled colour and depth for a frame several renderers draw
+/// (`Renderer::render_layers`), with the frame's projection.
 pub struct Layers {
     pub width: u32,
     pub height: u32,
@@ -559,8 +667,12 @@ impl Layers {
 
 pub struct Renderer {
     pub(crate) core: Rc<Core>,
+    /// Its device's cache (`DeviceCache`), kept while the renderer lives.
+    cache: Rc<DeviceCache>,
     pub(crate) frame_buffer: wgpu::Buffer,
     frame_bind_group: wgpu::BindGroup,
+    /// The environment `frame_bind_group` binds.
+    atlas: wgpu::Texture,
     pub(crate) meshes: Vec<GpuMesh>,
     pub(crate) textures: Vec<Texture>,
     pub(crate) white: TextureId,
@@ -568,6 +680,14 @@ pub struct Renderer {
     pub(crate) samplers: HashMap<(Wrap, u16), wgpu::Sampler>,
     pub items: Vec<Item>,
     pub(crate) gpu_items: Vec<Option<GpuItem>>,
+    /// Every item's uniforms, one slot of `stride` bytes per item (by index), written at once each
+    /// frame (`write_items`): items bind their slot at a dynamic offset. `None` until the first item
+    /// is prepared; remade larger when items are added.
+    uniforms: Option<wgpu::Buffer>,
+    /// A slot's size: the uniforms' size rounded up to the device's offset alignment.
+    stride: u64,
+    /// What `write_items` writes into `uniforms`.
+    staging: Vec<u8>,
     targets: Option<(u32, u32, wgpu::TextureView, wgpu::TextureView)>,
     /// The lights, exposure and environment intensity / turn (a lighting preset's values).
     pub lighting: Lighting,
@@ -659,11 +779,11 @@ pub struct PointLight {
     pub decay: f32,
 }
 
-/// Where `draw_pass` draws: the canvas (through the MSAA target; or one layer of a frame several
-/// renderers draw, and whether it is the first), or one of the glass buffers.
+/// Where `draw_pass` draws: the canvas (through the MSAA target), one of the glass buffers, or another
+/// view's targets.
 #[derive(Clone, Copy)]
 pub(crate) enum PassTarget<'a> {
-    Canvas(&'a wgpu::TextureView, Option<(&'a Layers, bool)>),
+    Canvas(&'a wgpu::TextureView),
     GlassMain,
     GlassBack,
     /// Another view of the scene (a scene floor's reflection): colour (`GLASS_BUFFER_FORMAT`) and depth.
@@ -759,10 +879,11 @@ impl Renderer {
     /// `environment`: the studio rig (a lighting preset's look, the quality tier, the clear colour) or
     /// a scene's prefiltered HDRI.
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat, environment: Environment<'_>) -> Self {
+        let cache = device_cache(device);
         let (core, atlas) = match environment {
             Environment::Studio { look, quality, clear } => {
                 let size = env::EnvSize::new(quality.preset().environment_resolution);
-                (core(device, format, size), env::build_environment(device, queue, look, quality, clear))
+                (core(device, format, size), cache.studio(device, queue, (look.cloned(), quality, clear)))
             }
             Environment::Atlas(atlas, size) => (core(device, format, size), atlas),
             Environment::Shared(s) => (s.core, s.atlas),
@@ -777,14 +898,20 @@ impl Renderer {
         let samplers = HashMap::new();
         let mut r = Renderer {
             core,
+            cache,
             frame_buffer,
             frame_bind_group,
+            atlas,
             meshes: Vec::new(),
             textures: Vec::new(),
             white: TextureId(0),
             samplers,
             items: Vec::new(),
             gpu_items: Vec::new(),
+            uniforms: None,
+            stride: (size_of::<MaterialUniform>().max(size_of::<HoloUniform>()) as u64)
+                .next_multiple_of(device.limits().min_uniform_buffer_offset_alignment as u64),
+            staging: Vec::new(),
             targets: None,
             lighting: Lighting::default(),
             holo: Vec::new(),
@@ -806,6 +933,11 @@ impl Renderer {
         };
         r.white = r.texture(device, queue, &[(1, 1, vec![255; 4])], false, Wrap::Clamp);
         r
+    }
+
+    /// The maps the cards made on this renderer's device share (`DeviceCache`).
+    pub(crate) fn device_maps(&self) -> Rc<crate::card::MapCache> {
+        self.cache.maps.clone()
     }
 
     /// Tags the untagged items from `from` on (`tags`).
@@ -946,6 +1078,7 @@ impl Renderer {
     /// Lights the card from another environment of the same size (a frame's new lighting preset).
     pub fn set_environment(&mut self, device: &wgpu::Device, atlas: &wgpu::Texture) {
         self.frame_bind_group = frame_bind_group(device, &self.core, &self.frame_buffer, atlas);
+        self.atlas = atlas.clone();
     }
 
     /// The frame bind group's layout (group 0 of every pipeline), for custom pipelines.
@@ -1086,6 +1219,63 @@ impl Renderer {
         };
     }
 
+    /// Makes every item's bind group and pipelines now, while the card is built (the last one still
+    /// shown), so that its first frame doesn't stall on them: the canvas's, and the half-float
+    /// targets' when the card draws into them (a glass card's buffers, a scene floor's reflection).
+    pub(crate) fn warm(&mut self, device: &wgpu::Device) {
+        let buffers = self.glass_passes.is_some() || self.offscreen;
+        self.slots(device);
+        for i in 0..self.items.len() {
+            if self.custom[i].is_some() {
+                continue;
+            }
+            self.prepare(device, i);
+            let mut key = self.gpu_items[i].as_ref().unwrap().key;
+            self.pipeline(device, key);
+            if buffers && !key.holo {
+                key.buffer = true;
+                self.pipeline(device, key);
+                if key.glass {
+                    key.side = Side::Back;
+                    self.pipeline(device, key);
+                }
+            }
+        }
+    }
+
+    /// Makes `uniforms` hold a slot for every item; a new buffer drops the bind groups on the old.
+    fn slots(&mut self, device: &wgpu::Device) {
+        let size = self.items.len().max(1) as u64 * self.stride;
+        if self.uniforms.as_ref().is_some_and(|b| b.size() >= size) {
+            return;
+        }
+        self.uniforms = Some(device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("items"),
+            size,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        }));
+        self.gpu_items.clear();
+    }
+
+    /// A slot of `uniforms` as a binding, `size` bytes at the item's dynamic offset.
+    fn slot(&self, size: usize) -> wgpu::BindingResource<'_> {
+        let buffer = self.uniforms.as_ref().expect("slots made before items are prepared");
+        wgpu::BindingResource::Buffer(wgpu::BufferBinding { buffer, offset: 0, size: wgpu::BufferSize::new(size as u64) })
+    }
+
+    /// Item `i`'s dynamic offset into `uniforms`.
+    fn offset(&self, i: usize) -> u32 {
+        (i as u64 * self.stride) as u32
+    }
+
+    /// Writes item `i`'s material uniforms alone (a glass pass turning its faces).
+    pub(crate) fn write_item(&self, queue: &wgpu::Queue, i: usize) {
+        if let (Some(b), Some(g)) = (&self.uniforms, self.gpu_items.get(i).and_then(|g| g.as_ref())) {
+            queue.write_buffer(b, i as u64 * self.stride, bytemuck::bytes_of(&g.uniform));
+        }
+    }
+
     fn prepare(&mut self, device: &wgpu::Device, i: usize) {
         if self.gpu_items.len() <= i {
             self.gpu_items.resize_with(i + 1, || None);
@@ -1094,16 +1284,10 @@ impl Renderer {
             return;
         }
         if self.holo[i].is_some() {
-            let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("holo"),
-                size: size_of::<HoloUniform>() as u64,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: None,
                 layout: &self.holo_gpu.as_ref().expect("holo items come from add_holo").draw_layout,
-                entries: &[wgpu::BindGroupEntry { binding: 0, resource: buffer.as_entire_binding() }],
+                entries: &[wgpu::BindGroupEntry { binding: 0, resource: self.slot(size_of::<HoloUniform>()) }],
             });
             let key = PipelineKey {
                 holo: true,
@@ -1116,7 +1300,7 @@ impl Renderer {
                 glass: false,
                 buffer: false,
             };
-            self.gpu_items[i] = Some(GpuItem { buffer, bind_group, uniform: bytemuck::Zeroable::zeroed(), key });
+            self.gpu_items[i] = Some(GpuItem { bind_group, uniform: bytemuck::Zeroable::zeroed(), key });
             return;
         }
         let (surface, colour) = {
@@ -1129,18 +1313,12 @@ impl Renderer {
         self.sampler(device, colour.0, colour.1);
         let m = &self.items[i].material;
         let tex = |t: Option<TextureId>| &self.textures[t.unwrap_or(self.white).0];
-        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size: size_of::<MaterialUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
         let sampler = |k: (Wrap, u16)| &self.samplers[&k];
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &self.core.draw_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: buffer.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 0, resource: self.slot(size_of::<MaterialUniform>()) },
                 wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&tex(m.normal_map).view) },
                 wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&tex(m.roughness_map).view) },
                 wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&tex(m.map).view) },
@@ -1177,7 +1355,7 @@ impl Renderer {
             glass: m.glass.is_some(),
             buffer: false,
         };
-        self.gpu_items[i] = Some(GpuItem { buffer, bind_group, uniform, key });
+        self.gpu_items[i] = Some(GpuItem { bind_group, uniform, key });
     }
 
     /// Renders the scene with the card turned by Euler XYZ angles (radians) into `target`, the camera
@@ -1215,10 +1393,14 @@ impl Renderer {
             Some(w) => (w, view),
             None => (&self.point_lights, view * model),
         };
-        for (k, p) in lights.iter().take(4).enumerate() {
+        // A black light adds nothing (a shine add-on turned away still has its two): left out, it
+        // costs the shader no loop and leaves its slot to a light that shows.
+        let mut count = 0;
+        for (k, p) in lights.iter().filter(|p| p.color != [0.0; 3]).take(4).enumerate() {
             let v = to_view.transform_point3(Vec3::from(p.position));
             points[2 * k] = [v.x, v.y, v.z, p.distance];
             points[2 * k + 1] = [p.color[0], p.color[1], p.color[2], p.decay];
+            count = k + 1;
         }
         let fill = (Mat3::from_mat4(view) * Vec3::from(lt.fill_position)).normalize();
         let fill_on = if lt.fill == [0.0; 3] { 0.0 } else { 1.0 };
@@ -1228,7 +1410,7 @@ impl Renderer {
             light_dir: [light.x, light.y, light.z, 0.0],
             light_color: [lt.key[0], lt.key[1], lt.key[2], 0.0],
             ambient: [lt.ambient[0], lt.ambient[1], lt.ambient[2], 0.0],
-            misc: [lt.exposure, if linear { 1.0 } else { 0.0 }, lights.len().min(4) as f32, 0.0],
+            misc: [lt.exposure, if linear { 1.0 } else { 0.0 }, count as f32, 0.0],
             env: [lt.env_intensity, lt.env_rotation_y, 0.0, 0.0],
             points,
             fill_dir: [fill.x, fill.y, fill.z, 0.0],
@@ -1236,11 +1418,15 @@ impl Renderer {
         }
     }
 
-    /// Writes every visible item's uniforms for `view` (the card at `slot`) and returns them in three's
-    /// draw order: opaque by render order (then insertion), transparent by render order then farthest
-    /// first.
-    pub(crate) fn write_items(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: Mat4, slot: Mat4) -> Vec<usize> {
+    /// Writes every visible item's uniforms for `view` (the card at `slot`; `write` false: only orders
+    /// them, for a frame whose passes write their own first) and returns them in three's draw order:
+    /// opaque by render order (then insertion), transparent by render order then farthest first. The
+    /// card's own items' go into `uniforms` in one write.
+    pub(crate) fn write_items(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, view: Mat4, slot: Mat4, write: bool) -> Vec<usize> {
         let mut order: Vec<(bool, f32, f32, usize)> = Vec::new();
+        self.slots(device);
+        let stride = self.stride as usize;
+        let mut end = 0;
         for i in 0..self.items.len() {
             if !self.items[i].visible {
                 continue;
@@ -1248,7 +1434,9 @@ impl Renderer {
             if let Some(c) = &self.custom[i] {
                 let it = &self.items[i];
                 let mv = if c.world { view * it.transform } else { view * slot * it.transform };
-                queue.write_buffer(&c.uniform, 0, bytemuck::bytes_of(&mat(mv)));
+                if write {
+                    queue.write_buffer(&c.uniform, 0, bytemuck::bytes_of(&mat(mv)));
+                }
                 let z = (mv * self.meshes[it.mesh.0].centre.extend(1.0)).z;
                 order.push((it.material.transparent, it.render_order, if it.material.transparent { z } else { 0.0 }, i));
                 continue;
@@ -1256,7 +1444,16 @@ impl Renderer {
             self.prepare(device, i);
             let it = &self.items[i];
             let mv = view * slot * it.transform;
+            let z = (mv * self.meshes[it.mesh.0].centre.extend(1.0)).z;
+            order.push((it.material.transparent, it.render_order, if it.material.transparent { z } else { 0.0 }, i));
+            if !write {
+                continue;
+            }
             let g = self.gpu_items[i].as_mut().unwrap();
+            if self.staging.len() < (i + 1) * stride {
+                self.staging.resize((i + 1) * stride, 0);
+            }
+            let at = &mut self.staging[i * stride..];
             if let Some(h) = self.holo[i] {
                 let v = h.values;
                 let l = crate::holo::light_direction();
@@ -1267,7 +1464,7 @@ impl Renderer {
                     params3: [h.edge_side, 0.0, 0.0, 0.0],
                     light: [l[0], l[1], l[2], 0.0],
                 };
-                queue.write_buffer(&g.buffer, 0, bytemuck::bytes_of(&u));
+                at[..size_of::<HoloUniform>()].copy_from_slice(bytemuck::bytes_of(&u));
             } else {
                 let m = &it.material;
                 // Opacity may change from frame to frame (an effect fading a layer), and a sticker's
@@ -1282,10 +1479,12 @@ impl Renderer {
                 }
                 g.uniform.model_view = mat(mv);
                 g.uniform.normal_matrix = mat(Mat4::from_mat3(Mat3::from_mat4(mv).inverse().transpose()));
-                queue.write_buffer(&g.buffer, 0, bytemuck::bytes_of(&g.uniform));
+                at[..size_of::<MaterialUniform>()].copy_from_slice(bytemuck::bytes_of(&g.uniform));
             }
-            let z = (mv * self.meshes[it.mesh.0].centre.extend(1.0)).z;
-            order.push((it.material.transparent, it.render_order, if it.material.transparent { z } else { 0.0 }, i));
+            end = (i + 1) * stride;
+        }
+        if end > 0 {
+            queue.write_buffer(self.uniforms.as_ref().unwrap(), 0, &self.staging[..end]);
         }
         order.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)).then(a.2.total_cmp(&b.2)).then(a.3.cmp(&b.3)));
         order.iter().map(|o| o.3).collect()
@@ -1318,7 +1517,7 @@ impl Renderer {
         let view = cam.view32();
         let frame = self.frame_uniform(view, proj, model, true);
         queue.write_buffer(&self.frame_buffer, 0, bytemuck::bytes_of(&frame));
-        let order = self.write_items(device, queue, view, model);
+        let order = self.write_items(device, queue, view, model, true);
         for e in &self.eyes {
             e.write(queue, model, cam);
         }
@@ -1337,23 +1536,58 @@ impl Renderer {
     /// from `cam`.
     pub fn render_with(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, target: &wgpu::TextureView, width: u32, height: u32, model: Mat4, cam: &Camera) {
         let proj = Self::projection(width as f32 / height as f32);
-        self.render_frame(device, queue, target, width, height, model, cam, proj, None);
+        self.render_frame(device, queue, target, width, height, model, cam, proj);
     }
 
-    /// Draws the card as one layer of a frame several renderers draw in turn into `layers` (resolved
-    /// into `target` each time): the first clears it (to transparent), the others draw over it, depth
-    /// tested against what is there.
-    pub fn render_layer(
-        &mut self,
+    /// Draws several renderers' cards (each with its world transform) into one frame (the marquee),
+    /// in order: every card's uniforms and its own passes first (a glass card's buffers), then all of
+    /// them in one pass over `layers`, resolved into `target` once, each depth tested against those
+    /// before it. Cards whose frame uniform and environment are the same share the first one's.
+    pub fn render_layers(
+        cards: &mut [(&mut Renderer, Mat4)],
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         target: &wgpu::TextureView,
         layers: &Layers,
-        first: bool,
-        model: Mat4,
         cam: &Camera,
     ) {
-        self.render_frame(device, queue, target, layers.width, layers.height, model, cam, layers.proj, Some((layers, first)));
+        let mut draws = Vec::with_capacity(cards.len());
+        let mut first: Option<(FrameUniform, wgpu::Texture)> = None;
+        for (k, (r, model)) in cards.iter_mut().enumerate() {
+            let (order, glass, frame) = r.prepare_frame(device, queue, layers.width, layers.height, *model, cam, layers.proj);
+            let shares = first.as_ref().is_some_and(|(f, atlas)| bytemuck::bytes_of(f) == bytemuck::bytes_of(&frame) && *atlas == r.atlas);
+            if !shares {
+                queue.write_buffer(&r.frame_buffer, 0, bytemuck::bytes_of(&frame));
+            }
+            if k == 0 {
+                first = Some((frame, r.atlas.clone()));
+            }
+            let glass = glass.map(|gi| (gi, GlassBuffer::Main));
+            let keys = r.keys(device, &order, glass, false);
+            draws.push((order, glass, keys, if shares { 0 } else { k }));
+        }
+        let mut encoder = device.create_command_encoder(&Default::default());
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("cards"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &layers.msaa,
+                    resolve_target: Some(target),
+                    depth_slice: None,
+                    ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Discard },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &layers.depth,
+                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Discard }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
+            for ((r, _), (order, glass, keys, frame)) in cards.iter().zip(&draws) {
+                r.record(&mut pass, order, keys, *glass, false, &cards[*frame].0.frame_bind_group);
+            }
+        }
+        queue.submit([encoder.finish()]);
     }
 
     fn render_frame(
@@ -1366,9 +1600,8 @@ impl Renderer {
         model: Mat4,
         cam: &Camera,
         proj: Mat4,
-        layer: Option<(&Layers, bool)>,
     ) {
-        if layer.is_none() && self.targets.as_ref().map(|t| (t.0, t.1)) != Some((width, height)) {
+        if self.targets.as_ref().map(|t| (t.0, t.1)) != Some((width, height)) {
             let make = |format, label| {
                 device
                     .create_texture(&wgpu::TextureDescriptor {
@@ -1385,6 +1618,28 @@ impl Renderer {
             };
             self.targets = Some((width, height, make(self.core.format, "msaa colour"), make(wgpu::TextureFormat::Depth32Float, "depth")));
         }
+        let (order, glass_item, frame) = self.prepare_frame(device, queue, width, height, model, cam, proj);
+        queue.write_buffer(&self.frame_buffer, 0, bytemuck::bytes_of(&frame));
+        let clear = match self.background {
+            Some(c) => wgpu::Color { r: c[0] as f64, g: c[1] as f64, b: c[2] as f64, a: 1.0 },
+            None => wgpu::Color::TRANSPARENT,
+        };
+        self.draw_pass(device, queue, PassTarget::Canvas(target), clear, &order, glass_item.map(|gi| (gi, GlassBuffer::Main)));
+    }
+
+    /// Everything a frame needs before the canvas's pass: the items' uniforms and order, a scene's
+    /// passes, a glass card's buffer passes. Returns the order, the glass item and the canvas's frame
+    /// uniform (for the caller to write: the passes leave `frame_buffer` as they need it).
+    fn prepare_frame(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        width: u32,
+        height: u32,
+        model: Mat4,
+        cam: &Camera,
+        proj: Mat4,
+    ) -> (Vec<usize>, Option<usize>, FrameUniform) {
         let view = cam.view32();
         let eye = cam.eye32();
         let pass_frame = PassFrame { camera: *cam, proj, model, width, height };
@@ -1398,46 +1653,36 @@ impl Renderer {
             queue.write_buffer(&h.frame_buffer, 0, bytemuck::bytes_of(&holo_frame));
         }
         let slot = model;
-        let order = self.write_items(device, queue, view, slot);
-        for e in &self.eyes {
-            e.write(queue, model, cam);
+        // A scene's passes draw other views first and write the items' uniforms for each: the canvas's
+        // follow them.
+        let order = self.write_items(device, queue, view, slot, passes.is_none());
+        if passes.is_none() {
+            for e in &self.eyes {
+                e.write(queue, model, cam);
+            }
         }
         let glass_item = order.iter().copied().find(|&i| self.items[i].material.glass.is_some());
         // A scene's passes: its reflection and contact shadow (for a glass card, its reflection without
         // the glass; the glass's buffers come next).
         if let Some(p) = passes.as_mut() {
             p.run(self, device, queue, &pass_frame, PassStage::First);
-            self.write_items(device, queue, view, slot);
+            self.write_items(device, queue, view, slot, true);
             for e in &self.eyes {
                 e.write(queue, model, cam);
             }
         }
-        queue.write_buffer(&self.frame_buffer, 0, bytemuck::bytes_of(&frame));
 
         // A glass body: its two buffer passes first (the `glass` chunk's).
         if let (Some(item), Some(run)) = (glass_item, self.glass_passes) {
             run(self, device, queue, &GlassFrame { item, order: &order, frame, pass_frame, view, eye }, &mut passes);
         }
         self.frame_passes = passes;
-        let clear = match self.background.filter(|_| layer.is_none()) {
-            Some(c) => wgpu::Color { r: c[0] as f64, g: c[1] as f64, b: c[2] as f64, a: 1.0 },
-            None => wgpu::Color::TRANSPARENT,
-        };
-        self.draw_pass(device, queue, PassTarget::Canvas(target, layer), clear, &order, glass_item.map(|gi| (gi, GlassBuffer::Main)));
+        (order, glass_item, frame)
     }
 
-    /// Draws `list` (already in draw order) into one target, in its own submission. `glass`: the glass
-    /// item and the buffer it refracts in this pass (the main buffer pass draws its back faces).
-    pub(crate) fn draw_pass(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        target: PassTarget<'_>,
-        clear: wgpu::Color,
-        list: &[usize],
-        glass: Option<(usize, GlassBuffer)>,
-    ) {
-        let buffer = !matches!(target, PassTarget::Canvas(..));
+    /// The pipeline keys `list` draws with into the canvas or (`buffer`) a half-float target, each
+    /// pipeline made if it isn't yet; `None` for custom items.
+    fn keys(&mut self, device: &wgpu::Device, list: &[usize], glass: Option<(usize, GlassBuffer)>, buffer: bool) -> Vec<Option<PipelineKey>> {
         let keys: Vec<Option<PipelineKey>> = list
             .iter()
             .map(|&i| {
@@ -1453,17 +1698,24 @@ impl Renderer {
         for k in keys.iter().flatten() {
             self.pipeline(device, *k);
         }
-        // A layer after the first keeps what the earlier layers drew (colour and depth).
-        let (mut load, mut store) = (wgpu::LoadOp::Clear(clear), None);
+        keys
+    }
+
+    /// Draws `list` (already in draw order) into one target, in its own submission. `glass`: the glass
+    /// item and the buffer it refracts in this pass (the main buffer pass draws its back faces).
+    pub(crate) fn draw_pass(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        target: PassTarget<'_>,
+        clear: wgpu::Color,
+        list: &[usize],
+        glass: Option<(usize, GlassBuffer)>,
+    ) {
+        let buffer = !matches!(target, PassTarget::Canvas(..));
+        let keys = self.keys(device, list, glass, buffer);
         let (colour, resolve, depth) = match target {
-            PassTarget::Canvas(view, Some((layers, first))) => {
-                if !first {
-                    load = wgpu::LoadOp::Load;
-                }
-                store = Some(wgpu::StoreOp::Store);
-                (&layers.msaa, Some(view), &layers.depth)
-            }
-            PassTarget::Canvas(view, None) => {
+            PassTarget::Canvas(view) => {
                 let (_, _, msaa, depth) = self.targets.as_ref().unwrap();
                 (msaa, Some(view), depth)
             }
@@ -1481,60 +1733,74 @@ impl Renderer {
                     view: colour,
                     resolve_target: resolve,
                     depth_slice: None,
-                    ops: wgpu::Operations { load, store: store.unwrap_or(if resolve.is_some() { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store }) },
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(clear),
+                        store: if resolve.is_some() { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store },
+                    },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: depth,
-                    depth_ops: Some(wgpu::Operations {
-                        load: if matches!(load, wgpu::LoadOp::Load) { wgpu::LoadOp::Load } else { wgpu::LoadOp::Clear(1.0) },
-                        store: store.unwrap_or(wgpu::StoreOp::Discard),
-                    }),
+                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Discard }),
                     stencil_ops: None,
                 }),
                 ..Default::default()
             });
-            let shared = self.core.pipelines.borrow();
-            pass.set_bind_group(0, &self.frame_bind_group, &[]);
-            for (&i, key) in list.iter().zip(&keys) {
-                let it = &self.items[i];
-                let m = &self.meshes[it.mesh.0];
-                let Some(key) = key else {
-                    // A custom item: its own pipeline and bind group 1, the frame's group 0.
-                    let c = self.custom[i].as_ref().unwrap();
-                    let range = c.range.clone().unwrap_or(0..m.count);
-                    if range.is_empty() || c.instances == 0 {
-                        continue;
-                    }
-                    pass.set_bind_group(0, &self.frame_bind_group, &[]);
-                    pass.set_pipeline(if buffer { c.buffer_pipeline.as_ref().unwrap() } else { &c.pipeline });
-                    pass.set_bind_group(1, &*c.bind_group, &[]);
-                    pass.set_vertex_buffer(0, m.vertices.slice(..));
-                    if let Some(extra) = &c.extra {
-                        pass.set_vertex_buffer(1, extra.slice(..));
-                    }
-                    pass.set_index_buffer(m.indices.slice(..), wgpu::IndexFormat::Uint32);
-                    pass.draw_indexed(range, 0, 0..c.instances);
-                    continue;
-                };
-                let g = self.gpu_items[i].as_ref().unwrap();
-                let (frame_group, pipeline) = match (&self.holo_gpu, key.holo) {
-                    (Some(h), true) => (&h.frame_bind_group, &h.pipelines[key]),
-                    _ => (&self.frame_bind_group, &shared[key]),
-                };
-                pass.set_bind_group(0, frame_group, &[]);
-                pass.set_pipeline(pipeline);
-                pass.set_bind_group(1, &g.bind_group, &[]);
-                if key.glass {
-                    let t = self.glass_gpu.as_ref().and_then(|g| g.targets.as_ref()).expect("glass buffers");
-                    let back = glass.is_some_and(|(gi, b)| gi == i && b == GlassBuffer::Back);
-                    pass.set_bind_group(2, if back { &t.6 } else { &t.5 }, &[]);
-                }
-                pass.set_vertex_buffer(0, m.vertices.slice(..));
-                pass.set_index_buffer(m.indices.slice(..), wgpu::IndexFormat::Uint32);
-                pass.draw_indexed(0..m.count, 0, 0..1);
-            }
+            self.record(&mut pass, list, &keys, glass, buffer, &self.frame_bind_group);
         }
         queue.submit([encoder.finish()]);
+    }
+
+    /// Records `list` into `pass` with its `keys` (`keys`), group 0 from `frame` (a frame bind group
+    /// holding the same values as the renderer's own).
+    fn record(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        list: &[usize],
+        keys: &[Option<PipelineKey>],
+        glass: Option<(usize, GlassBuffer)>,
+        buffer: bool,
+        frame: &wgpu::BindGroup,
+    ) {
+        let shared = self.core.pipelines.borrow();
+        pass.set_bind_group(0, frame, &[]);
+        for (&i, key) in list.iter().zip(keys) {
+            let it = &self.items[i];
+            let m = &self.meshes[it.mesh.0];
+            let Some(key) = key else {
+                // A custom item: its own pipeline and bind group 1, the frame's group 0.
+                let c = self.custom[i].as_ref().unwrap();
+                let range = c.range.clone().unwrap_or(0..m.count);
+                if range.is_empty() || c.instances == 0 {
+                    continue;
+                }
+                pass.set_bind_group(0, frame, &[]);
+                pass.set_pipeline(if buffer { c.buffer_pipeline.as_ref().unwrap() } else { &c.pipeline });
+                pass.set_bind_group(1, &*c.bind_group, &[]);
+                pass.set_vertex_buffer(0, m.vertices.slice(..));
+                if let Some(extra) = &c.extra {
+                    pass.set_vertex_buffer(1, extra.slice(..));
+                }
+                pass.set_index_buffer(m.indices.slice(..), wgpu::IndexFormat::Uint32);
+                pass.draw_indexed(range, 0, 0..c.instances);
+                continue;
+            };
+            let g = self.gpu_items[i].as_ref().unwrap();
+            let (frame_group, pipeline) = match (&self.holo_gpu, key.holo) {
+                (Some(h), true) => (&h.frame_bind_group, &h.pipelines[key]),
+                _ => (frame, &shared[key]),
+            };
+            pass.set_bind_group(0, frame_group, &[]);
+            pass.set_pipeline(pipeline);
+            pass.set_bind_group(1, &g.bind_group, &[self.offset(i)]);
+            if key.glass {
+                let t = self.glass_gpu.as_ref().and_then(|g| g.targets.as_ref()).expect("glass buffers");
+                let back = glass.is_some_and(|(gi, b)| gi == i && b == GlassBuffer::Back);
+                pass.set_bind_group(2, if back { &t.6 } else { &t.5 }, &[]);
+            }
+            pass.set_vertex_buffer(0, m.vertices.slice(..));
+            pass.set_index_buffer(m.indices.slice(..), wgpu::IndexFormat::Uint32);
+            pass.draw_indexed(0..m.count, 0, 0..1);
+        }
     }
 }
 
@@ -1586,6 +1852,16 @@ pub(crate) fn uniform_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
+/// An item's uniforms: its slot of the renderer's buffer, at a dynamic offset (`Renderer::uniforms`).
+fn slot_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+        ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: None },
+        count: None,
+    }
+}
+
 pub(crate) fn texture_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding,
@@ -1613,7 +1889,7 @@ impl HoloGpu {
         let shader =
             device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("holo"), source: wgpu::ShaderSource::Wgsl(wgsl!("holo.wgsl").into()) });
         let frame_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("holo frame"), entries: &[uniform_entry(0)] });
-        let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("holo draw"), entries: &[uniform_entry(0)] });
+        let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("holo draw"), entries: &[slot_entry(0)] });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("holo"),
             bind_group_layouts: &[Some(&frame_layout), Some(&draw_layout)],

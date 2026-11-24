@@ -21,6 +21,9 @@ import { createPublicAssets } from "@card3d/core/editor";
 import { marqueeSmootherstep as smootherstep, marqueeSmoothstep as smoothstep, mountMarquee, type IntroPhase, type MarqueeHandle } from "@card3d/core/marquee";
 import { publicMarqueeDesigns, type ShowcaseDesign } from "./designs.ts";
 import { loadLocalPlugin } from "../local-plugin.ts";
+import { reloadOnStaleBuild } from "../ui/stale-build.ts";
+
+reloadOnStaleBuild();
 
 type UiPhase = "waiting" | "chrome" | "wordmark" | "done";
 

@@ -26,7 +26,7 @@ const OVERLAY_STEP: f32 = 0.001;
 /// Parameter slots in the layer uniform (`Face.params`).
 pub const MAX_PARAMS: usize = 16;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Target {
     Skin,
     Overlay,
@@ -678,7 +678,7 @@ pub fn errors_json(errors: &[LayerError]) -> String {
 /// What main calls each frame.
 trait Frame {
     fn update(&mut self, dt: f64, model: Mat4);
-    fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue, model: Mat4, cam: &crate::renderer::Camera);
+    fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue);
     fn set_pointer(&mut self, ndc: [f64; 2]);
     fn wheel(&mut self, delta: f64);
 }
@@ -712,35 +712,41 @@ impl Gpu<'_> {
     /// The layers' bind group layout, pipeline layout, sampler and blank texture.
     #[inline(always)]
     pub(crate) fn new<'d>(r: &mut Renderer, device: &'d wgpu::Device, queue: &wgpu::Queue) -> Gpu<'d> {
-        let entry = |binding, ty| wgpu::BindGroupLayoutEntry { binding, visibility: wgpu::ShaderStages::VERTEX_FRAGMENT, ty, count: None };
-        let tex = wgpu::BindingType::Texture {
-            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-            view_dimension: wgpu::TextureViewDimension::D2,
-            multisampled: false,
-        };
-        let smp = wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering);
-        let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("face shader"),
-            entries: &[
-                entry(0, wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None }),
-                entry(1, tex),
-                entry(2, smp),
-                entry(3, tex),
-                entry(4, smp),
-            ],
+        // Made once per device for the frame's layout (`renderer::memo`), as the pipelines on them.
+        let frame_layout = r.frame_layout();
+        let made = crate::renderer::memo(device, "face layouts", 2, crate::renderer::key_of(frame_layout), || {
+            let entry = |binding, ty| wgpu::BindGroupLayoutEntry { binding, visibility: wgpu::ShaderStages::VERTEX_FRAGMENT, ty, count: None };
+            let tex = wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::D2,
+                multisampled: false,
+            };
+            let smp = wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering);
+            let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("face shader"),
+                entries: &[
+                    entry(0, wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None }),
+                    entry(1, tex),
+                    entry(2, smp),
+                    entry(3, tex),
+                    entry(4, smp),
+                ],
+            });
+            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("face shader"),
+                bind_group_layouts: &[Some(frame_layout), Some(&bind_layout)],
+                immediate_size: 0,
+            });
+            let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("face shader"),
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                mipmap_filter: wgpu::MipmapFilterMode::Linear,
+                ..Default::default()
+            });
+            (frame_layout.clone(), bind_layout, layout, sampler)
         });
-        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("face shader"),
-            bind_group_layouts: &[Some(r.frame_layout()), Some(&bind_layout)],
-            immediate_size: 0,
-        });
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("face shader"),
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::MipmapFilterMode::Linear,
-            ..Default::default()
-        });
+        let (_, bind_layout, layout, sampler) = (*made).clone();
         let blank_tex = r.texture(device, queue, &[(1, 1, vec![0; 4])], true, crate::renderer::Wrap::Clamp);
         Gpu { device, layout, bind_layout, sampler, blank: r.texture_view(blank_tex).clone(), format: r.format() }
     }
@@ -750,7 +756,26 @@ impl Gpu<'_> {
     }
 
     /// `pipeline`; `buffer`: an overlay drawn into the half-float views (a scene floor's reflection).
+    /// Made once per device for the same module (`renderer::memo`).
     pub(crate) fn pipeline_into(&self, module: &wgpu::ShaderModule, target: Target, blend: Blend, linear: bool, buffer: bool) -> wgpu::RenderPipeline {
+        let made = self.cached(module, target, blend, linear, buffer).unwrap_or_else(|| self.make_pipeline(module, target, blend, linear, buffer));
+        self.keep(module, target, blend, linear, buffer, &made);
+        made
+    }
+
+    /// The pipeline `pipeline_into` made before, if it did.
+    fn cached(&self, module: &wgpu::ShaderModule, target: Target, blend: Blend, linear: bool, buffer: bool) -> Option<wgpu::RenderPipeline> {
+        let key = crate::renderer::key_of((module, &self.layout, target, blend, linear, buffer, self.format));
+        crate::renderer::cached::<(wgpu::ShaderModule, wgpu::PipelineLayout, wgpu::RenderPipeline)>(self.device, "face pipeline", key).map(|m| m.2.clone())
+    }
+
+    /// Keeps `pipeline` for `pipeline_into` (a custom layer's, once it linked).
+    fn keep(&self, module: &wgpu::ShaderModule, target: Target, blend: Blend, linear: bool, buffer: bool, pipeline: &wgpu::RenderPipeline) {
+        let key = crate::renderer::key_of((module, &self.layout, target, blend, linear, buffer, self.format));
+        crate::renderer::remember(self.device, "face pipeline", 48, key, Rc::new((module.clone(), self.layout.clone(), pipeline.clone())));
+    }
+
+    fn make_pipeline(&self, module: &wgpu::ShaderModule, target: Target, blend: Blend, linear: bool, buffer: bool) -> wgpu::RenderPipeline {
         let comp = |s, d| wgpu::BlendComponent { src_factor: s, dst_factor: d, operation: wgpu::BlendOperation::Add };
         use wgpu::BlendFactor as F;
         let keep = target == Target::Skin;
@@ -856,10 +881,7 @@ impl FaceLayers {
         let mut skins: [Option<Skin>; 2] = [None, None];
         for side in 0..2 {
             if let Some(texture) = o.skins[side] {
-                let module = Rc::new(device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                    label: Some("face base"),
-                    source: wgpu::ShaderSource::Wgsl(base_source.as_str().into()),
-                }));
+                let module = crate::effects::module(device, "face base", &base_source);
                 let data = common(side, Target::Skin, 1.0, 0.0, &[]);
                 let uniform = new_buffer(&data);
                 let artwork = o.artwork[side].map_or_else(|| gpu.blank.clone(), |t| r.texture_view(t).clone());
@@ -889,8 +911,16 @@ impl FaceLayers {
             if l.target == Target::Skin && skins[l.side].is_none() {
                 continue;
             }
+            // Compiled once per device (`renderer::memo`); custom code is kept once it compiled.
+            let module_key = crate::renderer::key_of(l.source.as_str());
+            let made = crate::renderer::cached::<wgpu::ShaderModule>(device, "module", module_key);
             let module = match modules.iter().find(|(src, _)| Rc::ptr_eq(src, &l.source) || **src == *l.source) {
                 Some((_, m)) => m.clone(),
+                None if made.is_some() => {
+                    let m = made.unwrap();
+                    modules.push((l.source.clone(), m.clone()));
+                    m
+                }
                 None => {
                     let scope = l.custom.then(|| device.push_error_scope(wgpu::ErrorFilter::Validation));
                     let m = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -922,6 +952,7 @@ impl FaceLayers {
                         }
                     }
                     let m = Rc::new(m);
+                    crate::renderer::remember(device, "module", 16, module_key, m.clone());
                     modules.push((l.source.clone(), m.clone()));
                     m
                 }
@@ -953,12 +984,25 @@ impl FaceLayers {
             let source = runtime.as_ref().and_then(|rt| rt.source()).unwrap_or(&gpu.blank);
             let bind_group = Rc::new(gpu.bind_group_with(&uniform, &artwork, source));
             let scope = l.custom.then(|| device.push_error_scope(wgpu::ErrorFilter::Validation));
-            let pipeline = gpu.pipeline(&module, l.target, l.blend, l.linear);
-            let buffer_pipeline = (r.offscreen && l.target == Target::Overlay).then(|| Rc::new(gpu.pipeline_into(&module, l.target, l.blend, l.linear, true)));
+            // A custom layer's pipelines are kept once they linked.
+            let made = |buffer: bool| match l.custom {
+                true => {
+                    gpu.cached(&module, l.target, l.blend, l.linear, buffer).unwrap_or_else(|| gpu.make_pipeline(&module, l.target, l.blend, l.linear, buffer))
+                }
+                false => gpu.pipeline_into(&module, l.target, l.blend, l.linear, buffer),
+            };
+            let pipeline = made(false);
+            let buffer_pipeline = (r.offscreen && l.target == Target::Overlay).then(|| Rc::new(made(true)));
             let failed = match scope {
                 Some(scope) => scope.pop().await.is_some(),
                 None => false,
             };
+            if l.custom && !failed {
+                gpu.keep(&module, l.target, l.blend, l.linear, false, &pipeline);
+                if let Some(b) = &buffer_pipeline {
+                    gpu.keep(&module, l.target, l.blend, l.linear, true, b);
+                }
+            }
             if failed {
                 errors.push(LayerError {
                     index: l.index,
@@ -1027,10 +1071,9 @@ impl FaceLayers {
         }
     }
 
-    /// Before a frame: the overlays' eye (the camera in each face's space), every uniform, and the
-    /// dirty skins re-rendered.
-    pub fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue, model: Mat4, cam: &crate::renderer::Camera) {
-        self.state.prepare(r, device, queue, model, cam);
+    /// Before a frame: the live layers' uniforms, and the dirty skins re-rendered.
+    pub fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue) {
+        self.state.prepare(r, device, queue);
     }
 
     /// The page's pointer (normalised device coordinates), for the runtimes that follow it.
@@ -1083,16 +1126,14 @@ impl Frame for State {
         }
     }
 
-    fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue, model: Mat4, cam: &crate::renderer::Camera) {
+    fn prepare(&mut self, r: &Renderer, device: &wgpu::Device, queue: &wgpu::Queue) {
         // The runtimes' surfaces first: the skins and overlays sample them.
         for rt in self.layers.iter_mut().filter_map(|l| l.runtime.as_mut()) {
             rt.prepare(device, queue);
         }
-        for l in &mut self.layers {
-            if let Some((_, t)) = l.overlay {
-                let eye = (model * t).inverse().transform_point3(cam.eye32());
-                l.data.eye = [eye.x, eye.y, eye.z, 0.0];
-            }
+        // A layer's own values change only while it is live (its clock and tilt; written when it was
+        // built): the renderer writes an overlay's model-view matrix and eye for each view it draws.
+        for l in self.layers.iter().filter(|l| l.live) {
             queue.write_buffer(&l.uniform, 0, bytemuck::bytes_of(&l.data));
         }
         for side in 0..2 {

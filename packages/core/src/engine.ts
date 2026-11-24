@@ -7,7 +7,7 @@
  * The engine draws every design except custom face shader layers in GLSL (from the three.js engine's
  * era, which `engineDraws` reports): it skips those layers and draws the rest of the card.
  */
-import { createCard, type EngineCard, type EnginePrintJob, type WasmCardStage } from "../wasm/loader.js";
+import { createCard, preloadEngine, type EngineCard, type EnginePrintJob, type WasmCardStage } from "../wasm/loader.js";
 import { AdaptiveResolution, type AdaptiveResolutionChange } from "./scene/adaptive-resolution.ts";
 import { DEFAULT_CARD_FONT, getCardFont, loadCardFont, loadDesignFont, textLineFamilies } from "./fonts.ts";
 import { QUALITY_PRESETS } from "./quality.ts";
@@ -294,6 +294,13 @@ function release(c: EngineCard): void {
   webgl?.getContext("webgl2")?.getExtension("WEBGL_lose_context")?.loseContext();
 }
 
+/**
+ * Whether a design has a layer that follows the page's pointer and wheel: liquid metal that reacts to
+ * motion (`motion`, default on). Only then does a stage listen on the window.
+ */
+const followsPointer = (design: CardDesign | null): boolean =>
+  (Array.isArray(design?.shaders) ? design.shaders : []).some((l) => l?.id === "liquid-metal" && l.enabled !== false && l.params?.motion !== false);
+
 /** Intros already played on this page (one per page). */
 let introPlayed = false;
 
@@ -335,6 +342,8 @@ export function createEngineStage(canvas: HTMLCanvasElement, opts: EngineStageOp
   let lastTick = -1;
   let markReleased!: () => void;
   const released = new Promise<void>((r) => (markReleased = r));
+  // The engine downloads while the first design's fonts and images load.
+  preloadEngine(opts.backend);
 
   // ── pixel ratio ───────────────────────────────────────────────────────────
   const fullRatio = () => {
@@ -389,7 +398,8 @@ export function createEngineStage(canvas: HTMLCanvasElement, opts: EngineStageOp
     const s = card.stage;
     if (s && flags & 2) opts.onRotationChange?.({ x: s.rotationX(), y: s.rotationY() });
     if (s && flags & 4) opts.onFlippedChange?.(s.flipped());
-    if (flags & 6) updateA11y();
+    // A drag turns the card every frame: the attributes change only with a flip or the intro.
+    if (flags & 4 || (flags & 2 && interactive && s && s.introState() !== element.dataset.intro)) updateA11y();
     resize();
     card.render();
   };
@@ -501,34 +511,40 @@ export function createEngineStage(canvas: HTMLCanvasElement, opts: EngineStageOp
   }
   // The page's pointer for face shader layers that follow it (live liquid metal reads its speed and
   // keeps drawing by itself), interactive or not, as the three.js engine listened on the window: the
-  // last position, cleared when it leaves.
-  if (typeof window !== "undefined") {
-    const move = (e: PointerEvent) => {
-      const s = card?.stage;
-      if (!s) return;
-      const r = (card?.canvas ?? canvas).getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) return;
-      s.setPointer(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-    };
-    const leave = () => card?.stage?.setPointer(NaN, NaN);
-    const out = (e: PointerEvent) => {
-      if (!e.relatedTarget) leave();
-    };
-    // Scrolling stirs liquid metal (its driver listens to the window's wheel, as three's does).
-    const wheel = (e: WheelEvent) => card?.stage?.wheel?.(e.deltaX, e.deltaY);
-    window.addEventListener("pointermove", move, { passive: true });
-    window.addEventListener("pointerdown", move, { passive: true });
-    window.addEventListener("pointerout", out);
-    window.addEventListener("blur", leave);
-    window.addEventListener("wheel", wheel, { passive: true });
-    cleanup.push(() => {
+  // last position, cleared when it leaves. Only while the design has such a layer and the stage runs.
+  let followingPointer = false;
+  const move = (e: PointerEvent) => {
+    const s = card?.stage;
+    if (!s) return;
+    const r = (card?.canvas ?? canvas).getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return;
+    s.setPointer(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  };
+  const leave = () => card?.stage?.setPointer(NaN, NaN);
+  const out = (e: PointerEvent) => {
+    if (!e.relatedTarget) leave();
+  };
+  // Scrolling stirs liquid metal (its driver listens to the window's wheel, as three's does).
+  const wheel = (e: WheelEvent) => card?.stage?.wheel?.(e.deltaX, e.deltaY);
+  const syncPointer = () => {
+    const want = typeof window !== "undefined" && !disposed && !paused && followsPointer(design);
+    if (want === followingPointer) return;
+    followingPointer = want;
+    if (want) {
+      window.addEventListener("pointermove", move, { passive: true });
+      window.addEventListener("pointerdown", move, { passive: true });
+      window.addEventListener("pointerout", out);
+      window.addEventListener("blur", leave);
+      window.addEventListener("wheel", wheel, { passive: true });
+    } else {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerdown", move);
       window.removeEventListener("pointerout", out);
       window.removeEventListener("blur", leave);
       window.removeEventListener("wheel", wheel);
-    });
-  }
+      leave();
+    }
+  };
   const onVisibility = () => {
     const visible = document.visibilityState !== "hidden";
     card?.stage?.setVisible(visible);
@@ -544,17 +560,21 @@ export function createEngineStage(canvas: HTMLCanvasElement, opts: EngineStageOp
   motion?.addEventListener?.("change", onMotion);
   cleanup.push(() => motion?.removeEventListener?.("change", onMotion));
 
+  /** Sets an attribute only when it changes (no mutation, no style or accessibility tree work). */
+  const attr = (name: string, value: string) => {
+    if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+  };
   function updateA11y() {
     const s = card?.stage;
     if (!interactive || !s) return;
     const flipped = s.flipped();
-    element.setAttribute("role", "button");
-    element.tabIndex = 0;
-    element.setAttribute("aria-pressed", String(flipped));
-    element.setAttribute("aria-label", `${label}; showing ${flipped ? "back" : "front"}`);
-    element.dataset.face = flipped ? "back" : "front";
+    attr("role", "button");
+    attr("tabindex", "0");
+    attr("aria-pressed", String(flipped));
+    attr("aria-label", `${label}; showing ${flipped ? "back" : "front"}`);
+    attr("data-face", flipped ? "back" : "front");
     const intro = s.introState();
-    if (intro) element.dataset.intro = intro;
+    if (intro) attr("data-intro", intro);
   }
 
   // ── designs ───────────────────────────────────────────────────────────────
@@ -572,6 +592,7 @@ export function createEngineStage(canvas: HTMLCanvasElement, opts: EngineStageOp
       if (disposed) return; // dispose() releases it
       card = c;
       if (!Number.isNaN(cameraDistance)) c.setCameraDistance(cameraDistance);
+      if (paused) c.setPaused(true);
       if (mine !== token) return void (await setDesign(design!));
     } else {
       await card.setDesign(json, { fontFamily });
@@ -579,6 +600,7 @@ export function createEngineStage(canvas: HTMLCanvasElement, opts: EngineStageOp
     }
     resetAdaptive();
     updateA11y();
+    syncPointer();
     invalidate();
   }
 
@@ -728,6 +750,8 @@ export function createEngineStage(canvas: HTMLCanvasElement, opts: EngineStageOp
     setPaused(p) {
       if (p === paused) return;
       paused = p;
+      card?.setPaused(p);
+      syncPointer();
       if (p) {
         cancelAnimationFrame(frame);
         frame = 0;
@@ -766,6 +790,7 @@ export function createEngineStage(canvas: HTMLCanvasElement, opts: EngineStageOp
       cancelAnimationFrame(frame);
       ro?.disconnect();
       endDrag();
+      syncPointer();
       for (const f of cleanup.splice(0)) f();
       const pending = starting;
       if (card) {
@@ -912,6 +937,8 @@ export function createOffscreenStage(opts: OffscreenStageOptions = {}): Offscree
 
   async function setDesign(design: CardDesign): Promise<void> {
     const mine = ++token;
+    // The engine downloads while the fonts and images load.
+    if (!card && !starting) preloadEngine(opts.backend);
     const fontFamily = await prepareFonts(design, assets);
     if (mine !== token || disposed) return;
     const json = JSON.stringify(design);

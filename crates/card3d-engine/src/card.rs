@@ -2,6 +2,7 @@
 //! `card/body.ts`, `card/chip.ts` and `card/branding.ts`, placed per `card/layers.ts`.
 
 use glam::{Mat4, Vec3};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::canvas::{Host, ImagePurpose};
@@ -10,7 +11,8 @@ use crate::design::CardDesign;
 use crate::edge;
 use crate::geometry::{self, BODY_DEPTH, CHIP_DEPTH_NATIVE, CHIP_SCALE};
 use crate::iso;
-use crate::material::{self, mip_chain, srgb_hex_to_linear};
+use crate::json::{Map, Value};
+use crate::material::{self, srgb_hex_to_linear};
 use crate::renderer::{Item, Material, Renderer, Wrap};
 use crate::shape;
 
@@ -40,11 +42,11 @@ pub struct CardOptions {
 }
 
 /// What the cards drawn into one frame share (the marquee's): the environment and the card shader's
-/// pipelines (`renderer::Shared`), and the maps already made (`SharedMaps`).
+/// pipelines (`renderer::Shared`), and the maps already made (`MapCache`).
 #[derive(Clone)]
 pub struct SharedCards {
     pub gpu: crate::renderer::Shared,
-    pub maps: Rc<dyn SharedMaps>,
+    pub maps: Rc<MapCache>,
 }
 
 impl std::fmt::Debug for SharedCards {
@@ -53,14 +55,103 @@ impl std::fmt::Debug for SharedCards {
     }
 }
 
+/// The recipe keys whose values a built card takes in place (`CardRenderer::retune`): its foils'
+/// uniform values, which only `holo::sides` reads. A side gaining or losing its foil still needs a
+/// build. A key added here must change nothing but uniforms that `retune` sets.
+const RETUNABLE: [&str; 14] = [
+    "holoStyle",
+    "foilTexture",
+    "foilIntensity",
+    "holoGlare",
+    "holoMotion",
+    "foilScale",
+    "foilCoverage",
+    "backHoloStyle",
+    "backFoilTexture",
+    "backFoilIntensity",
+    "backHoloGlare",
+    "backHoloMotion",
+    "backFoilScale",
+    "backFoilCoverage",
+];
+
+/// What a card is built from but for the values it takes in place (`CardRenderer::retune`): the
+/// design's JSON without the `RETUNABLE` recipe keys, the card's options, and what else the host
+/// supplies for it (`assets`; the web's: its images' sources). Cards built with equal keys differ only
+/// in those values.
+#[derive(PartialEq)]
+pub struct BuildKey {
+    design: Value,
+    options: (crate::quality::Quality, Option<String>, bool, bool, Option<u32>, bool),
+    assets: Vec<String>,
+}
+
+impl BuildKey {
+    /// `None` for a card of a frame's (`CardOptions::shared`), which is never retuned.
+    pub fn new(mut design: Value, options: &CardOptions, assets: Vec<String>) -> Option<BuildKey> {
+        // Every option, so that a new one can't be left out of the key.
+        let CardOptions { quality, custom_font_family, reduced_motion, keep_chip_bright, face_width, shared, print } = options;
+        if shared.is_some() {
+            return None;
+        }
+        if let Value::Object(Map(members)) = &mut design {
+            for (k, v) in members.iter_mut() {
+                if let (true, Value::Object(Map(recipe))) = (k == "recipe", v) {
+                    recipe.retain(|(k, _)| !RETUNABLE.contains(&k.as_str()));
+                }
+            }
+        }
+        let options = (*quality, custom_font_family.clone(), *reduced_motion, *keep_chip_bright, *face_width, *print);
+        Some(BuildKey { design, options, assets })
+    }
+}
+
+/// A surface's inputs: map size, grain and relief (bits), texture, orbit pattern.
+type SurfaceKey = (u32, u64, u64, String, bool);
+
 /// Maps several cards use alike: cards with the same surface inputs share their surface maps (as
-/// three's surface texture cache), and every card the chip's detail maps. The marquee keeps them
-/// (its code, reached through this vtable, stays in the `marquee` chunk).
-pub trait SharedMaps {
+/// three's surface texture cache; one no card uses any more is dropped when the next is made), and
+/// every card the chip's detail maps. The marquee's cards share the marquee's (`SharedCards`); a
+/// stage's cards those of their device (`renderer::DeviceCache`), so the next card, built while the
+/// last is still shown (Card Studio builds one on every panel change), finds them made.
+#[derive(Default)]
+pub struct MapCache {
+    /// A few at a time: a list (no hash map's code in the main wasm module).
+    surfaces: RefCell<Vec<(SurfaceKey, Rc<SharedSurface>)>>,
+    chip: RefCell<Option<(wgpu::Texture, wgpu::Texture)>>,
+}
+
+impl MapCache {
     /// The surface maps for `recipe` at `size` (a card keeps the `Rc` while it uses them).
-    fn surface(&self, device: &wgpu::Device, queue: &wgpu::Queue, size: u32, recipe: &crate::design::Recipe) -> Rc<SharedSurface>;
-    /// The chip's detail maps (colour, height).
-    fn chip(&self, device: &wgpu::Device, queue: &wgpu::Queue, host: &dyn Host) -> (wgpu::Texture, wgpu::Texture);
+    pub fn surface(&self, device: &wgpu::Device, queue: &wgpu::Queue, size: u32, recipe: &crate::design::Recipe) -> Rc<SharedSurface> {
+        let orbit = recipe.pattern == "orbit";
+        let key = (size, recipe.grain.to_bits(), recipe.relief.to_bits(), recipe.texture.clone(), orbit);
+        let mut cache = self.surfaces.borrow_mut();
+        if let Some((_, s)) = cache.iter().find(|e| e.0 == key) {
+            return s.clone();
+        }
+        cache.retain(|(_, s)| Rc::strong_count(s) > 1);
+        let mut maps = material::surface_maps(size, recipe.grain, recipe.relief, &recipe.texture, orbit);
+        let up = |px: &[u8]| crate::renderer::upload(device, queue, &material::mip_chain(px, size, size, false), false);
+        let (normal, rough) = (up(&maps.normal), up(&maps.roughness));
+        maps.normal = Vec::new();
+        maps.roughness = Vec::new();
+        let s = Rc::new(SharedSurface { normal, rough, maps });
+        cache.push((key, s.clone()));
+        s
+    }
+
+    /// The chip's detail maps (colour, height): the same for every card.
+    pub fn chip(&self, device: &wgpu::Device, queue: &wgpu::Queue, host: &dyn Host) -> (wgpu::Texture, wgpu::Texture) {
+        self.chip
+            .borrow_mut()
+            .get_or_insert_with(|| {
+                let (w, h, color, height) = chip::draw_detail(host);
+                let up = |px: &[u8], srgb| crate::renderer::upload(device, queue, &material::mip_chain(px, w, h, srgb), srgb);
+                (up(&color, true), up(&height, false))
+            })
+            .clone()
+    }
 }
 
 /// A surface's maps on the GPU (normal, roughness) and its values (`SurfaceMaps` without the pixels).
@@ -83,8 +174,8 @@ pub struct CardRenderer {
     vines: Option<crate::vines::Vines>,
     /// A staged scene's framing (`stagingView`: a floor or a sweep moves the camera).
     pub staging: Option<crate::stage::StagingView>,
-    /// Maps shared with other cards (`CardOptions::shared`) that this card uses.
-    _shared_maps: Option<Rc<SharedSurface>>,
+    /// The surface maps this card uses (shared with other cards: `MapCache`).
+    _surface: Rc<SharedSurface>,
     /// A print bake's card (`CardOptions::print`): the metal body's geometry ("card body") and the
     /// resolved material, for the AR model (`ar.rs`).
     pub body: Option<geometry::Mesh>,
@@ -153,20 +244,13 @@ impl CardRenderer {
             r.lighting.env_intensity = s.env_intensity as f32;
             r.lighting.env_rotation_y = s.env_rotation_y as f32;
         }
-        let surface_size = q.surface_size;
-        let (surface, normal, rough, shared_maps) = match &options.shared {
-            Some(sh) => {
-                let s = sh.maps.surface(device, queue, surface_size, recipe);
-                let (normal, rough) = (r.adopt_texture(&s.normal, Wrap::Repeat, 1), r.adopt_texture(&s.rough, Wrap::Repeat, 1));
-                (s.maps.clone(), normal, rough, Some(s))
-            }
-            None => {
-                let surface = material::surface_maps(surface_size, recipe.grain, recipe.relief, &recipe.texture, recipe.pattern == "orbit");
-                let normal = r.texture(device, queue, &mip_chain(&surface.normal, surface_size, surface_size, false), false, Wrap::Repeat);
-                let rough = r.texture(device, queue, &mip_chain(&surface.roughness, surface_size, surface_size, false), false, Wrap::Repeat);
-                (surface, normal, rough, None)
-            }
+        let maps = match &options.shared {
+            Some(sh) => sh.maps.clone(),
+            None => r.device_maps(),
         };
+        let shared_surface = maps.surface(device, queue, q.surface_size, recipe);
+        let surface = &shared_surface.maps;
+        let (normal, rough) = (r.adopt_texture(&shared_surface.normal, Wrap::Repeat, 1), r.adopt_texture(&shared_surface.rough, Wrap::Repeat, 1));
         let anisotropy = surface.anisotropy.min(q.body_anisotropy);
         let body_depth = if glass { crate::glass_geometry::GLASS_THICKNESS } else { BODY_DEPTH };
         let j = (body_depth / 2.0) as f32;
@@ -292,7 +376,7 @@ impl CardRenderer {
                 let tex = crate::artwork::texture(&mut r, device, queue, &img, 1);
                 artwork[back as usize] = Some(tex);
                 let inlay = design.surface_treatments.get(side).is_some_and(|t| t == "inlay");
-                let i = crate::artwork::add(&mut r, plane, body_depth, back, crate::artwork::material(tex, inlay, &m, &surface, normal, rough));
+                let i = crate::artwork::add(&mut r, plane, body_depth, back, crate::artwork::material(tex, inlay, &m, surface, normal, rough));
                 r.items[i].visible = !plan.hides_artwork[back as usize];
                 r.tag(i, [ARTWORK, 0, 0, 0]);
             }
@@ -372,16 +456,9 @@ impl CardRenderer {
         let n = r.items.len();
         r.add(item(shell, Material { color: srgb_hex_to_linear("#c6c8c5"), ..chip_material.clone() }, chip_transform, 10.0));
         // `createProceduralChipDetailMaterial`: anisotropy 4 on both maps.
-        let (chip_color, chip_height) = match &options.shared {
-            Some(sh) => {
-                let (c, h) = sh.maps.chip(device, queue, host);
-                (r.adopt_texture(&c, Wrap::Clamp, 4), r.adopt_texture(&h, Wrap::Clamp, 4))
-            }
-            None => {
-                let (tw, th, color_px, height_px) = chip::draw_detail(host);
-                let c = r.texture_with(device, queue, &mip_chain(&color_px, tw, th, true), true, Wrap::Clamp, 4);
-                (c, r.texture_with(device, queue, &mip_chain(&height_px, tw, th, false), false, Wrap::Clamp, 4))
-            }
+        let (chip_color, chip_height) = {
+            let (c, h) = maps.chip(device, queue, host);
+            (r.adopt_texture(&c, Wrap::Clamp, 4), r.adopt_texture(&h, Wrap::Clamp, 4))
         };
         let detail = Material {
             color: srgb_hex_to_linear("#e0e1de"),
@@ -459,9 +536,33 @@ impl CardRenderer {
         };
         r.tag(n, [ADDON, 0, 0, 0]);
         let staging = scene.and_then(|s| (s.finish)(&mut r, device, queue, host));
+        r.warm(device);
         let body = (options.print && !glass).then_some(body_mesh);
         let material = options.print.then_some(m);
-        Ok(CardRenderer { renderer: r, frame, stickers, faces, shine, vines, staging, _shared_maps: shared_maps, body, material })
+        Ok(CardRenderer { renderer: r, frame, stickers, faces, shine, vines, staging, _surface: shared_surface, body, material })
+    }
+
+    /// Takes `design`'s foil values (each side's style, texture, intensity, glare, motion, scale and
+    /// coverage) in place: all that tells it from the design this card was built from when their
+    /// `BuildKey`s are equal. False, changing nothing, when a side would gain or lose its foil, or when
+    /// the card animates by itself: its animations' clocks have run, and a built card's start at zero
+    /// (the studio sets a design again to export it, and two exports must come out the same).
+    pub fn retune(&mut self, design: &CardDesign) -> bool {
+        if self.animated() {
+            return false;
+        }
+        let (front, back) = crate::holo::sides(&design.recipe);
+        let holo = &mut self.renderer.holo;
+        let has = |front: bool| holo.iter().flatten().any(|h| h.front == front);
+        if has(true) != front.is_some() || has(false) != back.is_some() {
+            return false;
+        }
+        for h in holo.iter_mut().flatten() {
+            if let Some(values) = if h.front { front } else { back } {
+                h.values = values;
+            }
+        }
+        true
     }
 
     /// Face shader layers that couldn't be built (custom code that doesn't parse or compile).
@@ -510,7 +611,7 @@ impl CardRenderer {
     /// Before drawing: the face shaders' uniforms and skins, the add-ons' per-frame state.
     pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, model: Mat4, cam: &crate::renderer::Camera) {
         if let Some(f) = self.faces.as_mut() {
-            f.prepare(&self.renderer, device, queue, model, cam);
+            f.prepare(&self.renderer, device, queue);
         }
         if let Some(s) = self.shine.as_mut() {
             s.prepare(&mut self.renderer, queue, model, cam);

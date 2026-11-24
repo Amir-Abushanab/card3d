@@ -1,0 +1,6 @@
+# Cloudflare Pages response headers (copied into dist/ by the build).
+# Everything under /assets/ is named by its content hash (scripts, styles, the engine's wasm parts,
+# fonts, environments), so it never changes under a URL: browsers keep it for a year without asking.
+# HTML and the unhashed public files (favicon, stickers) keep Pages' default and revalidate.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

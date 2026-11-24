@@ -33,6 +33,7 @@ export interface ThumbRequest {
 }
 
 export interface ThumbSchedulerDeps {
+  /** The thumbnail stage, called under `exclusive` (it may be a new one after an idle while). */
   stage(): CaptureStage;
   cache: ThumbCache;
   version: string;
@@ -71,7 +72,8 @@ export class ThumbScheduler {
   private seq = 0;
   private running = false;
   private lock: Promise<unknown> = Promise.resolve();
-  private warmed = false;
+  /** The stage that drew its warm-up frame (`deps.stage()` makes a new one after an idle while). */
+  private warmed: CaptureStage | null = null;
   private lastInput = 0;
   private lastIdleJob = -Infinity;
   readonly stats: ThumbStats = { rendered: 0, cached: 0, jobs: [] };
@@ -127,6 +129,11 @@ export class ThumbScheduler {
     void this.pump();
   }
 
+  /** Thumbnails are queued or rendering. */
+  get busy(): boolean {
+    return this.running || this.queue.size > 0;
+  }
+
   /** Raise queued items to `visible` (e.g. the category the user switched to). */
   prioritize(ids: readonly string[]): void {
     const want = new Set(ids);
@@ -175,14 +182,14 @@ export class ThumbScheduler {
   private async render(job: Job): Promise<void> {
     try {
       const off = this.deps.stage();
-      if (!this.warmed) {
+      if (this.warmed !== off) {
         // A fresh stage's first frame can precede its environment upload: draw (and drop) one first.
         const base = defaultDesign();
         base.cardholderName = "";
         await off.setDesign(base, "warm-up");
         await this.slot(job.priority);
         off.frame({ width: job.width, height: job.height });
-        this.warmed = true;
+        this.warmed = off;
         await this.slot(job.priority);
       }
       const t0 = performance.now();

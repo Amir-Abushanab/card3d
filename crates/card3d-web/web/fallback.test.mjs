@@ -2,7 +2,8 @@
 //   node crates/card3d-web/web/fallback.test.mjs
 //   CARD3D_SWIFTSHADER=1 node crates/card3d-web/web/fallback.test.mjs   # no GPU: headless, on SwiftShader (CI)
 // 1. a normal start uses WebGPU and clears its "starting" mark; leaving early is not a crash;
-// 2. a device loss after the first frames moves the card to WebGL, and later loads skip WebGPU;
+// 2. a device loss after the first frames moves the card to WebGL, and later loads skip WebGPU; the
+//    page's cards share one device, so every card on it moves;
 // 3. a load that finds the "starting" mark (the last start crashed the tab) goes straight to WebGL;
 // 4. a lazily loaded part of the engine that fails to download once is retried; one that keeps
 //    failing rejects with Card3dLoadError and counts nothing against WebGPU;
@@ -81,16 +82,25 @@ try {
   await page.waitForTimeout(2600);
   console.log("ok: quick reload stays on WebGPU");
 
-  // 2. Device loss → WebGL, remembered.
+  // 2. Device loss → WebGL, remembered; a second card on the page shares the device and moves too.
+  await page.evaluate(async (loader) => {
+    const { createCard } = await import(loader);
+    const canvas = Object.assign(document.createElement("canvas"), { width: 200, height: 125 });
+    document.body.append(canvas);
+    const design = await (await fetch("/crates/card3d-tools/designs/holo-front.json")).text();
+    window.__second = await createCard(canvas, design);
+    window.__second.render();
+  }, "/packages/core/wasm/loader.js");
+  assert.equal(await page.evaluate(() => window.__second.backend), "webgpu");
   await page.evaluate(() => window.__card.simulateDeviceLoss());
-  await page.waitForFunction(() => window.__card.backend === "webgl", null, { timeout: 15000 });
+  await page.waitForFunction(() => window.__card.backend === "webgl" && window.__second.backend === "webgl", null, { timeout: 15000 });
   await page.waitForTimeout(500);
   assert.ok((await opaquePixels()) > 1000, "the WebGL card draws");
   assert.match((await stored()) ?? "", /^failed:/);
   await page.reload();
   await ready();
   assert.equal(await page.evaluate(() => window.__card.backend), "webgl", "later loads skip WebGPU");
-  console.log("ok: device loss → WebGL, remembered");
+  console.log("ok: device loss → WebGL for every card on the page, remembered");
 
   // 3. Crash recovery: the mark from a start that never finished.
   await page.evaluate(() => localStorage.setItem("card3d:webgpu", `starting:${Date.now()}`));

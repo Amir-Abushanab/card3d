@@ -14,14 +14,12 @@
 //! On the web this is the `marquee` chunk: [`create`] is its split point and everything else is
 //! reached through the returned trait object, so none of it lands in the main module.
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use glam::{DVec3, Mat4, Vec3};
 
-use crate::canvas::Host;
-use crate::card::{CardOptions, CardRenderer, SharedCards, SharedMaps, SharedSurface};
+use crate::card::{CardOptions, CardRenderer, MapCache, SharedCards};
 use crate::marquee_model::*;
 use crate::quality::Quality;
 use crate::renderer::{Camera, Layers, Lighting, PointLight, Shared};
@@ -187,48 +185,6 @@ pub mod op {
     pub const WHEEL: u32 = 16;
     /// full (1) or performance (0).
     pub const SET_QUALITY: u32 = 17;
-}
-
-/// The maps the marquee's cards share (`SharedMaps`): surface maps by their inputs (one no card uses
-/// any more is dropped when the next is made) and the chip's detail maps.
-/// A surface's inputs: map size, grain and relief (bits), texture, orbit pattern.
-type SurfaceKey = (u32, u64, u64, String, bool);
-
-#[derive(Default)]
-struct MapCache {
-    surfaces: RefCell<HashMap<SurfaceKey, Rc<SharedSurface>>>,
-    chip: RefCell<Option<(wgpu::Texture, wgpu::Texture)>>,
-}
-
-impl SharedMaps for MapCache {
-    fn surface(&self, device: &wgpu::Device, queue: &wgpu::Queue, size: u32, recipe: &crate::design::Recipe) -> Rc<SharedSurface> {
-        let orbit = recipe.pattern == "orbit";
-        let key = (size, recipe.grain.to_bits(), recipe.relief.to_bits(), recipe.texture.clone(), orbit);
-        let mut cache = self.surfaces.borrow_mut();
-        if let Some(s) = cache.get(&key) {
-            return s.clone();
-        }
-        cache.retain(|_, s| Rc::strong_count(s) > 1);
-        let mut maps = crate::material::surface_maps(size, recipe.grain, recipe.relief, &recipe.texture, orbit);
-        let up = |px: &[u8]| crate::renderer::upload(device, queue, &crate::material::mip_chain(px, size, size, false), false);
-        let (normal, rough) = (up(&maps.normal), up(&maps.roughness));
-        maps.normal = Vec::new();
-        maps.roughness = Vec::new();
-        let s = Rc::new(SharedSurface { normal, rough, maps });
-        cache.insert(key, s.clone());
-        s
-    }
-
-    fn chip(&self, device: &wgpu::Device, queue: &wgpu::Queue, host: &dyn Host) -> (wgpu::Texture, wgpu::Texture) {
-        self.chip
-            .borrow_mut()
-            .get_or_insert_with(|| {
-                let (w, h, color, height) = crate::chip::draw_detail(host);
-                let up = |px: &[u8], srgb| crate::renderer::upload(device, queue, &crate::material::mip_chain(px, w, h, srgb), srgb);
-                (up(&color, true), up(&height, false))
-            })
-            .clone()
-    }
 }
 
 /// The marquee on `device` (the `marquee` chunk: only pages with a marquee download it).
@@ -661,14 +617,19 @@ impl Marquee for MarqueeState {
             queue.submit([encoder.finish()]);
             return;
         }
-        for (k, &i) in order.iter().enumerate() {
-            let s = &mut self.slots[i];
-            let model = slot_matrix(&s.pose);
-            let c = s.card.as_mut().unwrap();
-            c.renderer.lighting = lighting;
-            c.renderer.world_lights = Some(lights.clone());
-            c.renderer.render_layer(device, queue, target, layers, k == 0, model, &cam);
-        }
+        let mut cards: Vec<(usize, &mut Slot)> = self.slots.iter_mut().enumerate().filter(|(_, s)| s.visible).collect();
+        cards.sort_by_key(|(i, _)| order.iter().position(|o| o == i));
+        let mut cards: Vec<(&mut crate::renderer::Renderer, Mat4)> = cards
+            .into_iter()
+            .map(|(_, s)| {
+                let model = slot_matrix(&s.pose);
+                let r = &mut s.card.as_mut().unwrap().renderer;
+                r.lighting = lighting;
+                r.world_lights = Some(lights.clone());
+                (r, model)
+            })
+            .collect();
+        crate::renderer::Renderer::render_layers(&mut cards, device, queue, target, layers, &cam);
     }
 
     fn intro_phase(&self) -> IntroPhase {

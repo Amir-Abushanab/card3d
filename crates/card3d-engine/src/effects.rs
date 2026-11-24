@@ -6,7 +6,7 @@ use glam::Mat4;
 use std::rc::Rc;
 
 /// One entry of an effect's group 1 (binding = its index), visible to both stages.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash)]
 pub enum Bind {
     Uniform,
     Texture,
@@ -14,7 +14,7 @@ pub enum Bind {
 }
 
 /// Where a pipeline draws.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Hash)]
 pub enum Target {
     /// The canvas: its format, 4× MSAA, the depth buffer.
     Canvas,
@@ -57,6 +57,18 @@ pub mod blend {
     pub const ADDITIVE: BlendState = BlendState { color: c(F::SrcAlpha, F::One, O::Add), alpha: c(F::One, F::One, O::Add) };
 }
 
+/// A shader module from WGSL, compiled once per device (`renderer::memo`).
+pub fn module(device: &wgpu::Device, label: &str, source: &str) -> wgpu::ShaderModule {
+    let make = || device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some(label), source: wgpu::ShaderSource::Wgsl(source.into()) });
+    (*crate::renderer::memo(device, "module", 16, crate::renderer::key_of(source), make)).clone()
+}
+
+/// A bind group layout, made once per device (`renderer::memo`), so pipelines made on it are too.
+pub fn layout(device: &wgpu::Device, label: &str, entries: &[wgpu::BindGroupLayoutEntry]) -> wgpu::BindGroupLayout {
+    let make = || device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some(label), entries });
+    (*crate::renderer::memo(device, "layout", 32, crate::renderer::key_of((label, entries)), make)).clone()
+}
+
 /// Group 1's layout: `entries[k]` at binding k.
 pub fn bind_layout(device: &wgpu::Device, label: &str, entries: &[Bind]) -> wgpu::BindGroupLayout {
     let entries: Vec<wgpu::BindGroupLayoutEntry> = entries
@@ -77,7 +89,7 @@ pub fn bind_layout(device: &wgpu::Device, label: &str, entries: &[Bind]) -> wgpu
             count: None,
         })
         .collect();
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some(label), entries: &entries })
+    layout(device, label, &entries)
 }
 
 /// A bind group of `layout` from its resources, in binding order.
@@ -88,8 +100,18 @@ pub fn bind_group(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, resourc
 }
 
 /// A pipeline on the frame's group 0 and `layout` as group 1, drawing the renderer's vertex layout
-/// (plus `o.extra`) into `target`.
+/// (plus `o.extra`) into `target`: made once per device for the same module and layouts (`module`,
+/// `layout`; `renderer::memo`).
 pub fn pipeline(r: &Renderer, device: &wgpu::Device, layout: &wgpu::BindGroupLayout, o: &PipelineOptions<'_>, target: Target) -> wgpu::RenderPipeline {
+    let inputs = (r.frame_layout(), layout, o.module, o.entries, &o.extra, o.depth_test, o.depth_write, o.blend, o.cull, target, r.format());
+    let key = crate::renderer::key_of((o.label, inputs));
+    let made = crate::renderer::memo(device, "pipeline", 64, key, || {
+        (r.frame_layout().clone(), layout.clone(), o.module.clone(), make_pipeline(r, device, layout, o, target))
+    });
+    made.3.clone()
+}
+
+fn make_pipeline(r: &Renderer, device: &wgpu::Device, layout: &wgpu::BindGroupLayout, o: &PipelineOptions<'_>, target: Target) -> wgpu::RenderPipeline {
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some(o.label),
         bind_group_layouts: &[Some(r.frame_layout()), Some(layout)],

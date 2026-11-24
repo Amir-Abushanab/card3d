@@ -592,7 +592,7 @@ impl PrintJob for Job {
         });
         let view = texture.create_view(&Default::default());
         let cam = Camera::look_at(glam::DVec3::new(0.0, 0.0, if back { -10.0 } else { 10.0 }), glam::DVec3::ZERO, 0.0);
-        self.card.renderer.render_layer(device, queue, &view, &layers, true, Mat4::IDENTITY, &cam);
+        crate::renderer::Renderer::render_layers(&mut [(&mut self.card.renderer, Mat4::IDENTITY)], device, queue, &view, &layers, &cam);
         read_back(device, queue, &texture, done);
     }
 }

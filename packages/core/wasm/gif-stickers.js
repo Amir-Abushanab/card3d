@@ -16,49 +16,79 @@ function canvas2d(w, h) {
   return [c, c.getContext("2d", { willReadFrequently: true })];
 }
 
-/** Steps 1–7 of `drawFrame`: scale to ≤ 720, pad, 32-tap cream dilation of the silhouette, frame on top. */
-function borderedFrame(frame, w, h) {
-  const k = Math.min(1, MAX_SIDE / Math.max(w, h));
-  const iw = Math.max(1, Math.round(w * k));
-  const ih = Math.max(1, Math.round(h * k));
-  const p = Math.max(7, Math.round(0.035 * Math.max(iw, ih)));
-  const [sa, a] = canvas2d(iw, ih);
-  a.imageSmoothingEnabled = true;
-  a.imageSmoothingQuality = "high";
-  a.drawImage(frame, 0, 0, iw, ih);
-  const [sb, b] = canvas2d(iw, ih);
-  b.drawImage(sa, 0, 0);
-  b.globalCompositeOperation = "source-in";
-  b.fillStyle = BORDER_COLOR;
-  b.fillRect(0, 0, iw, ih);
-  const [, o] = canvas2d(iw + 2 * p, ih + 2 * p);
-  const rho = 0.72 * p;
-  for (let j = 0; j < TAPS; j++) {
-    const phi = (2 * Math.PI * j) / TAPS;
-    o.drawImage(sb, p + rho * Math.cos(phi), p + rho * Math.sin(phi));
-  }
-  o.drawImage(sa, p, p);
-  return o.getImageData(0, 0, iw + 2 * p, ih + 2 * p);
+/**
+ * Steps 1–7 of `drawFrame`: scale to ≤ 720, pad, 32-tap cream dilation of the silhouette, frame on top.
+ * One per GIF: its canvases are reused from frame to frame (a GIF's frames share a size).
+ */
+function framer() {
+  let size = "";
+  let sa, a, sb, b, o;
+  return (frame, w, h) => {
+    const k = Math.min(1, MAX_SIDE / Math.max(w, h));
+    const iw = Math.max(1, Math.round(w * k));
+    const ih = Math.max(1, Math.round(h * k));
+    const p = Math.max(7, Math.round(0.035 * Math.max(iw, ih)));
+    if (size !== `${iw}x${ih}`) {
+      size = `${iw}x${ih}`;
+      [sa, a] = canvas2d(iw, ih);
+      [sb, b] = canvas2d(iw, ih);
+      [, o] = canvas2d(iw + 2 * p, ih + 2 * p);
+      a.imageSmoothingEnabled = true;
+      a.imageSmoothingQuality = "high";
+      b.fillStyle = BORDER_COLOR;
+    } else {
+      a.clearRect(0, 0, iw, ih);
+      b.clearRect(0, 0, iw, ih);
+      o.clearRect(0, 0, iw + 2 * p, ih + 2 * p);
+    }
+    a.drawImage(frame, 0, 0, iw, ih);
+    b.globalCompositeOperation = "source-over";
+    b.drawImage(sa, 0, 0);
+    b.globalCompositeOperation = "source-in";
+    b.fillRect(0, 0, iw, ih);
+    const rho = 0.72 * p;
+    for (let j = 0; j < TAPS; j++) {
+      const phi = (2 * Math.PI * j) / TAPS;
+      o.drawImage(sb, p + rho * Math.cos(phi), p + rho * Math.sin(phi));
+    }
+    o.drawImage(sa, p, p);
+    return o.getImageData(0, 0, iw + 2 * p, ih + 2 * p);
+  };
 }
 
 /**
- * Plays one GIF: calls `onFrame(imageData)` with each bordered frame until `stop()`. Never throws (a
- * GIF that can't be decoded warns once and draws nothing, as the three.js engine does). `firstFrame`
- * settles after the first frame was sent, or once decoding gave up (`GifDecalSource.firstFrame`).
+ * GIFs playing on the page by URL: cards showing the same GIF share one decoder (a page-wide
+ * registry, so separately bundled copies of this loader share it too).
  */
-export function playGif(url, onFrame) {
-  let first;
-  const firstFrame = new Promise((r) => (first = r));
-  const send = (frame) => {
-    onFrame(frame);
-    first();
-  };
+const playing = (globalThis[Symbol.for("card3d.gif-stickers")] ??= new Map());
+
+/**
+ * Decodes `url` for its subscribers (`playGif`): each frame goes to all of them. It runs while any of
+ * them is unpaused (the first frame is always sent), and stops when the last one leaves.
+ */
+function gifSource(url) {
+  const subs = new Set();
   let stopped = false;
   let timer = 0;
   let raf = 0;
   let decoder = null;
   let img = null;
+  /** The next frame's step, while paused. */
+  let pending = null;
+  let last = null;
+  let failed = false;
   const Decoder = globalThis.ImageDecoder;
+  const border = framer();
+  const running = () => [...subs].some((s) => !s.paused);
+  const send = (frame) => {
+    last = frame;
+    for (const s of subs) s.frame(frame);
+  };
+  /** Runs `next` now, or once a subscriber resumes. */
+  const later = (next) => {
+    if (running()) next();
+    else pending = next;
+  };
 
   const viaDecoder = async () => {
     const data = await (await fetch(url)).arrayBuffer();
@@ -71,12 +101,12 @@ export function playGif(url, onFrame) {
       if (stopped || !decoder) return;
       const { image } = await decoder.decode({ frameIndex: index, completeFramesOnly: true });
       if (stopped) return image.close();
-      send(borderedFrame(image, image.displayWidth, image.displayHeight));
+      send(border(image, image.displayWidth, image.displayHeight));
       const ms = clampMs((image.duration ?? 100000) / 1000);
       image.close();
       if (count === 1) return;
       index = (index + 1) % count;
-      timer = setTimeout(() => void step().catch(fail), ms);
+      timer = setTimeout(() => later(() => void step().catch(fail)), ms);
     };
     await step();
   };
@@ -88,21 +118,24 @@ export function playGif(url, onFrame) {
     img.src = url;
     document.body.appendChild(img);
     await img.decode();
-    let last = -Infinity;
+    let at = -Infinity;
     const loop = (t) => {
       if (stopped || !img) return;
-      if (t - last >= MIN_FRAME_MS) {
-        last = t;
-        send(borderedFrame(img, img.naturalWidth, img.naturalHeight));
+      if (t - at >= MIN_FRAME_MS) {
+        at = t;
+        send(border(img, img.naturalWidth, img.naturalHeight));
       }
-      raf = requestAnimationFrame(loop);
+      if (running()) raf = requestAnimationFrame(loop);
+      else pending = () => (raf = requestAnimationFrame(loop));
     };
     raf = requestAnimationFrame(loop);
   };
 
   const fail = (err) => {
-    if (!stopped) console.warn("[card3d] animated sticker failed", err);
-    first();
+    if (stopped) return;
+    console.warn("[card3d] animated sticker failed", err);
+    failed = true;
+    for (const s of subs) s.gaveUp();
   };
 
   void (async () => {
@@ -112,14 +145,62 @@ export function playGif(url, onFrame) {
   })().catch(fail);
 
   return {
-    firstFrame,
-    stop() {
+    subscribe(sub) {
+      subs.add(sub);
+      if (last) sub.frame(last);
+      else if (failed) sub.gaveUp();
+    },
+    unsubscribe(sub) {
+      subs.delete(sub);
+      if (subs.size) return;
       stopped = true;
-      first();
+      playing.delete(url);
       clearTimeout(timer);
       cancelAnimationFrame(raf);
       decoder?.close();
       img?.remove();
+    },
+    /** A subscriber resumed. */
+    wake() {
+      const next = pending;
+      pending = null;
+      next?.();
+    },
+  };
+}
+
+/**
+ * Plays one GIF: calls `onFrame(imageData)` with each bordered frame until `stop()`; `pause()` holds
+ * the current frame (after the first) and `resume()` goes on. Never throws (a GIF that can't be
+ * decoded warns once and draws nothing, as the three.js engine does). `firstFrame` settles after the
+ * first frame was sent, or once decoding gave up (`GifDecalSource.firstFrame`).
+ */
+export function playGif(url, onFrame) {
+  let first;
+  const firstFrame = new Promise((r) => (first = r));
+  const source = playing.get(url) ?? playing.set(url, gifSource(url)).get(url);
+  const sub = {
+    paused: false,
+    frame(f) {
+      onFrame(f);
+      first();
+    },
+    gaveUp: () => first(),
+  };
+  source.subscribe(sub);
+  return {
+    firstFrame,
+    pause() {
+      sub.paused = true;
+    },
+    resume() {
+      if (!sub.paused) return;
+      sub.paused = false;
+      source.wake();
+    },
+    stop() {
+      first();
+      source.unsubscribe(sub);
     },
   };
 }

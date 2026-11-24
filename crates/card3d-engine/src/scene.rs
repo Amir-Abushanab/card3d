@@ -876,16 +876,16 @@ fn upload_equirect(device: &wgpu::Device, queue: &wgpu::Queue, px: &EnvironmentP
 }
 
 fn env_module(device: &wgpu::Device) -> wgpu::ShaderModule {
-    device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("scene environment"),
-        source: wgpu::ShaderSource::Wgsl(format!("{}\n{}", wgsl!("plane.wgsl"), wgsl!("scene-env.wgsl")).into()),
-    })
+    effects::module(device, "scene environment", &format!("{}\n{}", wgsl!("plane.wgsl"), wgsl!("scene-env.wgsl")))
 }
 
 /// `PMREMGenerator.fromEquirectangular`.
 fn prefilter_equirect(device: &wgpu::Device, queue: &wgpu::Queue, size: EnvSize, equirect: &wgpu::TextureView, sampler: &wgpu::Sampler) -> wgpu::Texture {
     let module = env_module(device);
-    let pipeline = env::plane_pipeline(device, &module, "fs_equirect");
+    let made = crate::renderer::memo(device, "scene equirect", 1, crate::renderer::key_of(&module), || {
+        (module.clone(), env::plane_pipeline(device, &module, "fs_equirect"))
+    });
+    let pipeline = made.1.clone();
     let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
         layout: &pipeline.get_bind_group_layout(0),
@@ -933,22 +933,25 @@ fn cube_from_equirect(
 ) -> wgpu::Texture {
     use wgpu::util::DeviceExt;
     let module = env_module(device);
-    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("scene cube"),
-        layout: None,
-        vertex: wgpu::VertexState { module: &module, entry_point: Some("vs_full"), buffers: &[], compilation_options: Default::default() },
-        fragment: Some(wgpu::FragmentState {
-            module: &module,
-            entry_point: Some("fs_cube"),
-            targets: &[Some(wgpu::ColorTargetState { format: ATLAS_FORMAT, blend: None, write_mask: wgpu::ColorWrites::ALL })],
-            compilation_options: Default::default(),
-        }),
-        primitive: Default::default(),
-        depth_stencil: None,
-        multisample: Default::default(),
-        multiview_mask: None,
-        cache: None,
-    });
+    let make = || {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("scene cube"),
+            layout: None,
+            vertex: wgpu::VertexState { module: &module, entry_point: Some("vs_full"), buffers: &[], compilation_options: Default::default() },
+            fragment: Some(wgpu::FragmentState {
+                module: &module,
+                entry_point: Some("fs_cube"),
+                targets: &[Some(wgpu::ColorTargetState { format: ATLAS_FORMAT, blend: None, write_mask: wgpu::ColorWrites::ALL })],
+                compilation_options: Default::default(),
+            }),
+            primitive: Default::default(),
+            depth_stencil: None,
+            multisample: Default::default(),
+            multiview_mask: None,
+            cache: None,
+        })
+    };
+    let pipeline = crate::renderer::memo(device, "scene cube", 1, crate::renderer::key_of(&module), || (module.clone(), make())).1.clone();
     let mut u: GradeUniform = bytemuck::Zeroable::zeroed();
     u.face[1] = size;
     if let Some(g) = grade {
@@ -1124,25 +1127,23 @@ fn finish(setup: Setup, r: &mut Renderer, device: &wgpu::Device, queue: &wgpu::Q
     let view = staging_view(s, setup.height);
     let floor_y = view.and_then(|v| v.floor_y).unwrap_or(-setup.height / 2.0 - FLOOR_GAP);
     let (inner, outer, at) = preset_backdrop(setup.lighting);
-    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("scene"),
-        source: wgpu::ShaderSource::Wgsl(format!("{}{}\n{}", r.env_size().cubeuv_prelude(), wgsl!("cubeuv.wgsl"), wgsl!("scene.wgsl")).into()),
-    });
+    let module = effects::module(device, "scene", &format!("{}{}\n{}", r.env_size().cubeuv_prelude(), wgsl!("cubeuv.wgsl"), wgsl!("scene.wgsl")));
     let mut staging = Staging { items: Vec::new(), sweep: None, floor: None };
 
     // The background (`reassert`): the HDRI (blurred through its PMREM, or sharp), or a gradient.
     let env_backdrop = s.backdrop == Backdrop::Environment && setup.has_env;
     let gradient = s.backdrop == Backdrop::Gradient || (s.backdrop == Backdrop::Environment && !setup.has_env);
     if env_backdrop || gradient {
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("scene background"),
-            entries: &[
+        let layout = effects::layout(
+            device,
+            "scene background",
+            &[
                 uniform_layout_entry(0),
                 texture_layout_entry(1, wgpu::TextureViewDimension::Cube),
                 texture_layout_entry(2, wgpu::TextureViewDimension::D2),
                 sampler_layout_entry(3),
             ],
-        });
+        );
         let dummy_cube = setup.sharp.clone().unwrap_or_else(|| env::cube_texture(device, 1, "scene dummy cube"));
         let cube_view = dummy_cube.create_view(&wgpu::TextureViewDescriptor { dimension: Some(wgpu::TextureViewDimension::Cube), ..Default::default() });
         let (texture, entry, intensity, turn) = if env_backdrop {
@@ -1268,16 +1269,17 @@ impl FloorState {
         card_height: f64,
         quality: Quality,
     ) -> FloorState {
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("scene floor"),
-            entries: &[
+        let layout = effects::layout(
+            device,
+            "scene floor",
+            &[
                 uniform_layout_entry(0),
                 texture_layout_entry(1, wgpu::TextureViewDimension::D2),
                 texture_layout_entry(2, wgpu::TextureViewDimension::D2),
                 sampler_layout_entry(3),
                 sampler_layout_entry(4),
             ],
-        });
+        );
         let model = Mat4::from_translation(Vec3::new(0.0, y as f32, 0.0)) * Mat4::from_rotation_x(-std::f32::consts::FRAC_PI_2);
         let data = FloorUniform {
             model_view: Mat4::IDENTITY.to_cols_array_2d(),
@@ -1321,53 +1323,54 @@ impl FloorState {
         let item = add_world_item(r, device, &plane(40.0), model, FLOOR_ORDER, true, p, group, uniform.clone());
 
         // The passes' pipelines.
-        let passes = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("scene passes"),
-            source: wgpu::ShaderSource::Wgsl(wgsl!("scene-passes.wgsl").into()),
-        });
-        let frame_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some("contact shadow"), entries: &[uniform_layout_entry(0)] });
-        let model_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("contact shadow model"),
-            entries: &[wgpu::BindGroupLayoutEntry {
+        let passes = effects::module(device, "scene passes", wgsl!("scene-passes.wgsl"));
+        let frame_layout = effects::layout(device, "contact shadow", &[uniform_layout_entry(0)]);
+        let model_layout = effects::layout(
+            device,
+            "contact shadow model",
+            &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::VERTEX,
                 ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: true, min_binding_size: wgpu::BufferSize::new(64) },
                 count: None,
             }],
-        });
-        let dark_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("contact shadow"),
-            bind_group_layouts: &[Some(&frame_layout), Some(&model_layout)],
-            immediate_size: 0,
-        });
-        let dark = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("contact shadow darkness"),
-            layout: Some(&dark_layout),
-            vertex: wgpu::VertexState {
-                module: &passes,
-                entry_point: Some("vs_dark"),
-                buffers: crate::renderer::VERTEX_LAYOUT,
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &passes,
-                entry_point: Some("fs_dark"),
-                targets: &[Some(wgpu::ColorTargetState { format: GLASS_BUFFER_FORMAT, blend: None, write_mask: wgpu::ColorWrites::ALL })],
-                compilation_options: Default::default(),
-            }),
-            primitive: Default::default(),
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::LessEqual),
-                stencil: Default::default(),
-                bias: Default::default(),
-            }),
-            multisample: Default::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        );
+        let make_dark = || {
+            let dark_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("contact shadow"),
+                bind_group_layouts: &[Some(&frame_layout), Some(&model_layout)],
+                immediate_size: 0,
+            });
+            let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("contact shadow darkness"),
+                layout: Some(&dark_layout),
+                vertex: wgpu::VertexState {
+                    module: &passes,
+                    entry_point: Some("vs_dark"),
+                    buffers: crate::renderer::VERTEX_LAYOUT,
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &passes,
+                    entry_point: Some("fs_dark"),
+                    targets: &[Some(wgpu::ColorTargetState { format: GLASS_BUFFER_FORMAT, blend: None, write_mask: wgpu::ColorWrites::ALL })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: Default::default(),
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample: Default::default(),
+                multiview_mask: None,
+                cache: None,
+            });
+            (frame_layout.clone(), model_layout.clone(), passes.clone(), pipeline)
+        };
+        let dark = crate::renderer::memo(device, "contact shadow", 1, crate::renderer::key_of((&frame_layout, &model_layout, &passes)), make_dark).3.clone();
         let shadow = ShadowUniform { view_proj: shadow_view_proj(y).as_mat4().to_cols_array_2d(), params: [y as f32, SHADOW_HEIGHT as f32, 0.0, 0.0] };
         let dark_buf = effects::uniform_buffer(device, queue, "contact shadow", bytemuck::bytes_of(&shadow));
         let dark_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -1375,23 +1378,26 @@ impl FloorState {
             layout: &frame_layout,
             entries: &[wgpu::BindGroupEntry { binding: 0, resource: dark_buf.as_entire_binding() }],
         });
-        let full = |fs: &str| {
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(fs),
-                layout: None,
-                vertex: wgpu::VertexState { module: &passes, entry_point: Some("vs_quad"), buffers: &[], compilation_options: Default::default() },
-                fragment: Some(wgpu::FragmentState {
-                    module: &passes,
-                    entry_point: Some(fs),
-                    targets: &[Some(wgpu::ColorTargetState { format: GLASS_BUFFER_FORMAT, blend: None, write_mask: wgpu::ColorWrites::ALL })],
-                    compilation_options: Default::default(),
-                }),
-                primitive: Default::default(),
-                depth_stencil: None,
-                multisample: Default::default(),
-                multiview_mask: None,
-                cache: None,
-            })
+        let full = |fs: &'static str| {
+            let make = || {
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some(fs),
+                    layout: None,
+                    vertex: wgpu::VertexState { module: &passes, entry_point: Some("vs_quad"), buffers: &[], compilation_options: Default::default() },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &passes,
+                        entry_point: Some(fs),
+                        targets: &[Some(wgpu::ColorTargetState { format: GLASS_BUFFER_FORMAT, blend: None, write_mask: wgpu::ColorWrites::ALL })],
+                        compilation_options: Default::default(),
+                    }),
+                    primitive: Default::default(),
+                    depth_stencil: None,
+                    multisample: Default::default(),
+                    multiview_mask: None,
+                    cache: None,
+                })
+            };
+            crate::renderer::memo(device, "contact shadow blur", 2, crate::renderer::key_of((&passes, fs)), || (passes.clone(), make())).1.clone()
         };
         let blur = full("fs_blur");
         let mip = full("fs_mip");

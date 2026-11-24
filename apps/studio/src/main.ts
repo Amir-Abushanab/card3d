@@ -56,24 +56,24 @@ import { Panel, type Backdrop, type StudioUi } from "./panel/panel.ts";
 import { StickerEditor } from "./stickers/sticker-editor.ts";
 import { BUILTIN_STICKERS, artworkFromFile, stickerFromFile } from "./stickers/library.ts";
 import { logoFromFile } from "./stickers/logo.ts";
-import { DrawDialog } from "./draw/draw-dialog.ts";
 import { CAMERA_FOV, ExportStage, fitDistance } from "./export/offscreen.ts";
 import { exportClip, exportDesignJson, exportImage, exportSpecJson, fileBase, renderThumb } from "./export/exporters.ts";
 import { ThumbScheduler, type ThumbRequest } from "./export/thumbs.ts";
 import { openThumbCache } from "./export/thumb-cache.ts";
 import { thumbVersion } from "./export/thumb-key.ts";
 import { ENGINE_BUILD } from "virtual:card3d-build";
-import { CodeDialog } from "./ui/code-dialog.ts";
-import { EmbedDialog } from "./ui/embed-dialog.ts";
-import { ArDialog } from "./ui/ar-dialog.ts";
-import { ImportDialog } from "./ui/import-dialog.ts";
-import { FontDialog } from "./ui/font-dialog.ts";
 import { HistoryControls } from "./ui/history-controls.ts";
 import { dismissToast, showToast } from "./ui/toast.ts";
 import { downloadBlob, h, isTyping, pickFiles } from "./ui/dom.ts";
 import { describeFinishEnabled } from "./describe/flag.ts";
 import type { DescribeDialog } from "./describe/dialog.ts";
 import { loadLocalPlugin } from "./local-plugin.ts";
+import { reloadOnStaleBuild } from "./ui/stale-build.ts";
+
+/** Idle time after which the export stage is disposed (it is made again on the next export). */
+const EXPORT_STAGE_IDLE_MS = 60_000;
+/** Idle time after which the thumbnail stage is disposed (the queue drained; the next thumbnail makes it again). */
+const THUMB_STAGE_IDLE_MS = 5_000;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const stageEl = $<HTMLDivElement>("stage");
@@ -94,6 +94,9 @@ window.addEventListener("unhandledrejection", (e) => {
   if (isExtensionNoise((e.reason as Error)?.stack)) return;
   showToast({ message: `Error: ${msg}`, tone: "error" });
 });
+/** Saves the design before a reload for a new build (set once the design exists). */
+let saveBeforeReload: (() => void) | undefined;
+reloadOnStaleBuild(() => saveBeforeReload?.());
 
 async function boot(): Promise<void> {
   // The self-hosted card fonts (name/bio, the font picker's samples, and the panel's UI face).
@@ -352,9 +355,16 @@ async function boot(): Promise<void> {
   const history = new History({ getLive: () => design, onChange: () => historyControls?.update(history.getState()) });
   let saveTimer = 0;
   let warnedStorage = false;
+  // An edit not saved yet is saved before a reload.
+  saveBeforeReload = () => {
+    if (!saveTimer) return;
+    clearTimeout(saveTimer);
+    autosave(design);
+  };
   const scheduleAutosave = () => {
     clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => {
+      saveTimer = 0;
       const r = autosave(design);
       if (r !== "ok" && !warnedStorage) {
         warnedStorage = true;
@@ -402,11 +412,50 @@ async function boot(): Promise<void> {
   };
 
   // ── offscreen stages (lazy) ──
-  // Exports, thumbnails and AR models draw on the card engine.
+  // Exports, thumbnails and AR models draw on the card engine. Each stage holds a GPU device (or a
+  // WebGL context, which counts against the page's limit), so it goes once it has been idle a while
+  // and is made again on demand.
   let exportStage: ExportStage | null = null;
-  let thumbStage: ExportStage | null = null;
+  let exportUsers = 0;
+  let exportIdle: ReturnType<typeof setTimeout> | undefined;
   const getExportStage = () => (exportStage ??= new ExportStage(assets, "full"));
-  const getThumbStage = () => (thumbStage ??= new ExportStage(assets, "performance"));
+  /** Runs `fn` on the export stage; the stage is disposed a minute after the last use. */
+  const withExportStage = async <T>(fn: (s: ExportStage) => Promise<T>): Promise<T> => {
+    exportUsers++;
+    clearTimeout(exportIdle);
+    try {
+      return await fn(getExportStage());
+    } finally {
+      if (--exportUsers === 0) {
+        exportIdle = setTimeout(() => {
+          exportStage?.dispose();
+          exportStage = null;
+        }, EXPORT_STAGE_IDLE_MS);
+      }
+    }
+  };
+  let thumbStage: ExportStage | null = null;
+  let thumbUse = 0;
+  let thumbIdle: ReturnType<typeof setTimeout> | undefined;
+  /**
+   * The thumbnail stage (only used under `thumbScheduler.exclusive`): disposed once the queue has
+   * drained and the stage wasn't used for a while (a queue waiting for a quiet moment keeps it).
+   */
+  const getThumbStage = () => {
+    thumbStage ??= new ExportStage(assets, "performance");
+    const use = ++thumbUse;
+    clearTimeout(thumbIdle);
+    thumbIdle = setTimeout(
+      () =>
+        void thumbScheduler.exclusive(async () => {
+          if (use !== thumbUse || thumbScheduler.busy) return; // its next job resets the timer
+          thumbStage?.dispose();
+          thumbStage = null;
+        }),
+      THUMB_STAGE_IDLE_MS,
+    );
+    return thumbStage;
+  };
   /** The live card's pose (the interaction's, without the camera path's slot pose). */
   const liveQuaternion = () => stage.view()?.quaternion ?? { x: 0, y: 0, z: 0, w: 1 };
   /**
@@ -572,16 +621,17 @@ async function boot(): Promise<void> {
     showGate(source);
   };
 
-  // ── dialogs ──
-  let codeDialog: CodeDialog | null = null;
-  let embedDialog: EmbedDialog | null = null;
-  let arDialog: ArDialog | null = null;
-  let importDialog: ImportDialog | null = null;
-  let drawDialog: DrawDialog | null = null;
-  let fontDialog: FontDialog | null = null;
+  // ── dialogs (each loaded on first use) ──
+  let codeDialog: import("./ui/code-dialog.ts").CodeDialog | null = null;
+  let embedDialog: import("./ui/embed-dialog.ts").EmbedDialog | null = null;
+  let arDialog: import("./ui/ar-dialog.ts").ArDialog | null = null;
+  let importDialog: import("./ui/import-dialog.ts").ImportDialog | null = null;
+  let drawDialog: import("./draw/draw-dialog.ts").DrawDialog | null = null;
+  let fontDialog: import("./ui/font-dialog.ts").FontDialog | null = null;
 
   /** "Custom…" font: one undo step when a font is chosen. */
   const openFontDialog = async (tab?: CardCustomFont["source"]) => {
+    const { FontDialog } = await import("./ui/font-dialog.ts");
     fontDialog ??= new FontDialog(() => design.cardholderName);
     const f = await fontDialog.open(customFont(), tab);
     if (!f) return;
@@ -743,6 +793,7 @@ async function boot(): Promise<void> {
         edited(`remove ${side} artwork`);
       },
       onDraw: async (side) => {
+        const { DrawDialog } = await import("./draw/draw-dialog.ts");
         drawDialog ??= new DrawDialog();
         const src = design.surfaceSources[side];
         const result = await drawDialog.open(side, src ? assets.resolveUrl(src) : undefined);
@@ -791,7 +842,9 @@ async function boot(): Promise<void> {
       },
       onExportImage: async () => {
         try {
-          await exportImage(getExportStage(), stillOfLive(), liveQuaternion()!, outputSettings(), ui.imageFormat, ui.imageQuality);
+          const still = stillOfLive();
+          const pose = liveQuaternion();
+          await withExportStage((s) => exportImage(s, still, pose, outputSettings(), ui.imageFormat, ui.imageQuality));
         } catch (err) {
           showToast({ message: `Image export failed: ${(err as Error).message}`, tone: "error" });
           throw err;
@@ -806,18 +859,20 @@ async function boot(): Promise<void> {
           const t = liveSeconds();
           const clip = cloneDesign(design);
           const vines = clip.addons?.vines;
-          await exportClip(getExportStage(), clip, outputSettings(), {
-            prime: vines && vines.cycle !== false && vines.time === undefined ? t % 80 : 0,
-            format: ui.clipFormat,
-            seconds: ui.clipSeconds,
-            path: ui.clipPath,
-            easing: ui.clipEasing === "auto" ? undefined : ui.clipEasing,
-            fps: 30,
-            pitch: -8,
-            yaw: 0,
-            signal: ctrl.signal,
-            onProgress: (p) => progress.set(p),
-          });
+          await withExportStage((s) =>
+            exportClip(s, clip, outputSettings(), {
+              prime: vines && vines.cycle !== false && vines.time === undefined ? t % 80 : 0,
+              format: ui.clipFormat,
+              seconds: ui.clipSeconds,
+              path: ui.clipPath,
+              easing: ui.clipEasing === "auto" ? undefined : ui.clipEasing,
+              fps: 30,
+              pitch: -8,
+              yaw: 0,
+              signal: ctrl.signal,
+              onProgress: (p) => progress.set(p),
+            }),
+          );
         } catch (err) {
           if ((err as Error).name !== "AbortError") showToast({ message: `Recording failed: ${(err as Error).message}`, tone: "error" });
           throw err;
@@ -826,7 +881,8 @@ async function boot(): Promise<void> {
         }
       },
       onPreviewPath: () => (previewFrame ? stopPreview() : startPreview()),
-      onViewAr: () => {
+      onViewAr: async () => {
+        const { ArDialog } = await import("./ui/ar-dialog.ts");
         arDialog ??= new ArDialog({
           usdz: () => arModel("usdz"),
           glb: () => arModel("glb"),
@@ -836,8 +892,14 @@ async function boot(): Promise<void> {
         void arDialog.open();
       },
       onExportPrint: () => void openPrintDialog(),
-      onExportCode: () => (codeDialog ??= new CodeDialog(() => design)).open(),
-      onExportEmbed: () => (embedDialog ??= new EmbedDialog(() => design)).open(),
+      onExportCode: async () => {
+        const { CodeDialog } = await import("./ui/code-dialog.ts");
+        (codeDialog ??= new CodeDialog(() => design)).open();
+      },
+      onExportEmbed: async () => {
+        const { EmbedDialog } = await import("./ui/embed-dialog.ts");
+        (embedDialog ??= new EmbedDialog(() => design)).open();
+      },
       onExportGltf: async () => {
         try {
           // The card engine's model (the AR export's GLB: real scale, baked faces).
@@ -863,11 +925,13 @@ async function boot(): Promise<void> {
         }
       },
       onShare: shareLabel,
-      onImportRecipe: () =>
+      onImportRecipe: async () => {
+        const { ImportDialog } = await import("./ui/import-dialog.ts");
         (importDialog ??= new ImportDialog(
           () => design,
           (d) => applyUntrusted(d, "Imported recipe", "the imported JSON"),
-        )).open(),
+        )).open();
+      },
       onDraftSave: async () => {
         let thumb: string | undefined;
         try {
@@ -909,7 +973,7 @@ async function boot(): Promise<void> {
   const arModel = async (kind: "usdz" | "glb"): Promise<Blob> => {
     const still = stillOfLive();
     const type = kind === "usdz" ? "model/vnd.usdz+zip" : "model/gltf-binary";
-    return new Blob([new Uint8Array(await getExportStage().stage.exportAr(still, { format: kind }))], { type });
+    return new Blob([new Uint8Array(await withExportStage((s) => s.stage.exportAr(still, { format: kind })))], { type });
   };
 
   /**
@@ -922,7 +986,7 @@ async function boot(): Promise<void> {
     const t = liveSeconds();
     const still = stillDesign(cloneDesign(d), t, { vinesTime: t % 80 });
     const { bakePrint } = await import("@card3d/core/print");
-    return bakePrint(getExportStage().stage, still, o);
+    return withExportStage((s) => bakePrint(s.stage, still, o));
   };
   const openPrintDialog = async () => {
     if (!printDialog) {

@@ -5,7 +5,7 @@
  */
 import type { LibrarySticker } from "../state/storage.ts";
 import { canEncodeWebp, loadImage, readAsDataUrl } from "../ui/dom.ts";
-import { FACE_H, FACE_W } from "../draw/draw-dialog.ts";
+import { FACE_H, FACE_W } from "../draw/face.ts";
 
 const base = import.meta.env.BASE_URL;
 
