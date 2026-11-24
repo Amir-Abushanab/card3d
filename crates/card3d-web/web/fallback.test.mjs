@@ -83,14 +83,14 @@ try {
   console.log("ok: quick reload stays on WebGPU");
 
   // 2. Device loss → WebGL, remembered; a second card on the page shares the device and moves too.
-  await page.evaluate(async () => {
-    const { createCard } = await import("/packages/core/wasm/loader.js");
+  await page.evaluate(async (loader) => {
+    const { createCard } = await import(loader);
     const canvas = Object.assign(document.createElement("canvas"), { width: 200, height: 125 });
     document.body.append(canvas);
     const design = await (await fetch("/crates/card3d-tools/designs/holo-front.json")).text();
     window.__second = await createCard(canvas, design);
     window.__second.render();
-  });
+  }, "/packages/core/wasm/loader.js");
   assert.equal(await page.evaluate(() => window.__second.backend), "webgpu");
   await page.evaluate(() => window.__card.simulateDeviceLoss());
   await page.waitForFunction(() => window.__card.backend === "webgl" && window.__second.backend === "webgl", null, { timeout: 15000 });

@@ -5,8 +5,9 @@
   // pages Vite builds come in through knip's plugins; the entries below are the rest.
   "workspaces": {
     ".": {
-      // .ncurc.cjs: npm-check-updates' config (pnpm deps:outdated / deps:update).
-      "entry": ["scripts/*.mjs", ".ncurc.cjs"],
+      // .ncurc.cjs: npm-check-updates' config (pnpm deps:outdated / deps:update); crates/card3d-web/*.mjs:
+      // what build-web.sh runs on the web packages.
+      "entry": ["scripts/*.mjs", ".ncurc.cjs", "crates/card3d-web/*.mjs"],
       // build-environments.mjs shells out to libwebp's cwebp (a system tool, only for regenerating the HDRIs).
       "ignoreBinaries": ["cwebp"],
     },
