@@ -1,6 +1,6 @@
 {
   "name": "@card3d/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "3D metal cards on a Rust engine (WebGPU, with a WebGL 2 fallback) and the design model behind Card Studio",
   "keywords": [
     "3d",
