@@ -210,6 +210,16 @@ pub fn poisson_field(mask: &[bool], width: usize, height: usize) -> Vec<u8> {
     out
 }
 
+/// A quick hash of an image's bytes (FxHash's step over 8-byte words), for `renderer::memo`'s key.
+fn fingerprint(bytes: &[u8]) -> u64 {
+    let (words, rest) = bytes.as_chunks::<8>();
+    let mut h = bytes.len() as u64;
+    for w in words.iter().copied().chain([std::array::from_fn(|i| rest.get(i).copied().unwrap_or(0))]) {
+        h = (h.rotate_left(5) ^ u64::from_le_bytes(w)).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+    h
+}
+
 /// `toProcessedLiquidMetal`: the mask image (alpha = shape) as the surface's input: R the edge field
 /// (white at the edge), G the alpha, B and A 255; the image's size. The shape is read at the working
 /// size (the image drawn on a canvas, default smoothing); the field is drawn back up to the image's size
@@ -310,20 +320,20 @@ struct Surface {
 }
 
 impl Surface {
-    /// A surface drawing into `target` (`size`, RGBA8), with the processed `mask`
+    /// A surface drawing into `target` (`size`, RGBA8), with the processed mask's texture and aspect
     /// (none: Paper's procedural shape). Nothing is drawn until `draw` and `render`.
     fn new(
         r: &mut Renderer,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        mask: Option<&Image>,
+        mask: Option<&(wgpu::Texture, f64)>,
         values: Values,
         target: wgpu::TextureView,
         size: (u32, u32),
     ) -> Surface {
         // Paper's mask upload: no flip, no premultiply, mipmapped trilinear, clamped.
         let image = match mask {
-            Some(m) => r.texture(device, queue, &crate::material::mip_chain(&m.rgba, m.width, m.height, false), false, Wrap::Clamp),
+            Some((m, _)) => r.adopt_texture(m, Wrap::Clamp, 1),
             None => r.texture(device, queue, &[(1, 1, vec![0; 4])], false, Wrap::Clamp),
         };
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -345,29 +355,33 @@ impl Surface {
             &layout,
             &[uniform.as_entire_binding(), wgpu::BindingResource::TextureView(r.texture_view(image)), wgpu::BindingResource::Sampler(&sampler)],
         );
-        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("liquid metal"), source: wgpu::ShaderSource::Wgsl(SHADER.into()) });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("liquid metal"),
-            bind_group_layouts: &[Some(&layout)],
-            immediate_size: 0,
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("liquid metal (Paper Shaders)"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState { module: &module, entry_point: Some("vs"), buffers: &[], compilation_options: Default::default() },
-            fragment: Some(wgpu::FragmentState {
-                module: &module,
-                entry_point: Some("fs"),
-                targets: &[Some(wgpu::ColorTargetState { format: wgpu::TextureFormat::Rgba8Unorm, blend: None, write_mask: wgpu::ColorWrites::ALL })],
-                compilation_options: Default::default(),
-            }),
-            primitive: Default::default(),
-            depth_stencil: None,
-            multisample: Default::default(),
-            multiview_mask: None,
-            cache: None,
-        });
-        let image_aspect = mask.map_or(0.0, |m| m.width as f64 / m.height as f64);
+        let module = crate::effects::module(device, "liquid metal", SHADER);
+        let make = || {
+            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("liquid metal"),
+                bind_group_layouts: &[Some(&layout)],
+                immediate_size: 0,
+            });
+            let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("liquid metal (Paper Shaders)"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState { module: &module, entry_point: Some("vs"), buffers: &[], compilation_options: Default::default() },
+                fragment: Some(wgpu::FragmentState {
+                    module: &module,
+                    entry_point: Some("fs"),
+                    targets: &[Some(wgpu::ColorTargetState { format: wgpu::TextureFormat::Rgba8Unorm, blend: None, write_mask: wgpu::ColorWrites::ALL })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: Default::default(),
+                depth_stencil: None,
+                multisample: Default::default(),
+                multiview_mask: None,
+                cache: None,
+            });
+            (layout.clone(), module.clone(), pipeline)
+        };
+        let pipeline = crate::renderer::memo(device, "liquid metal", 1, crate::renderer::key_of((&layout, &module)), make).2.clone();
+        let image_aspect = mask.map_or(0.0, |m| m.1);
         Surface { values, size, image_aspect, uniform, pipeline, bind_group, target, pending: false, next: None }
     }
 
@@ -618,7 +632,20 @@ fn face_runtime(r: &mut Renderer, o: &FaceLayer<'_>) -> Box<dyn Runtime> {
         1 => Some(brand_mark(o.host, o.face_width)),
         _ => None,
     };
-    let mask = mask.map(|m| process_mask(o.host, &m));
+    // The processed mask, made once per device for the same image (`renderer::memo`).
+    let key = match o.look.mask {
+        1 => crate::renderer::key_of(("brand", o.face_width)),
+        _ => mask.as_ref().map_or(0, |m| crate::renderer::key_of((m.width, m.height, fingerprint(&m.rgba)))),
+    };
+    let mask = mask.map(|m| {
+        crate::renderer::memo(o.device, "liquid metal mask", 2, key, || {
+            let p = process_mask(o.host, &m);
+            (
+                crate::renderer::upload(o.device, o.queue, &crate::material::mip_chain(&p.rgba, p.width, p.height, false), false),
+                p.width as f64 / p.height as f64,
+            )
+        })
+    });
     let w = o.face_width.max(16);
     let size = (w, face_height(w));
     let texture = o.device.create_texture(&wgpu::TextureDescriptor {
@@ -634,7 +661,7 @@ fn face_runtime(r: &mut Renderer, o: &FaceLayer<'_>) -> Box<dyn Runtime> {
     let view = texture.create_view(&Default::default());
     let (chip, aspect) = frame_chip(o.frame);
     let values = Values::new(o.look.look, mask.is_some(), chip, aspect);
-    let mut surface = Surface::new(r, o.device, o.queue, mask.as_ref(), values, view.clone(), size);
+    let mut surface = Surface::new(r, o.device, o.queue, mask.as_deref(), values, view.clone(), size);
     let driver = if o.live {
         surface.draw(o.queue, 0.0);
         let mut d = Driver::new(o.look.look, o.look.speed, o.look.motion);

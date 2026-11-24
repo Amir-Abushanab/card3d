@@ -112,55 +112,60 @@ pub fn build(
     let pal = if p.str("tone") == "ice" { ICE } else { GOLD };
     let cream = pal.cream;
 
-    // Aura: a 256×384 ring, pastel hue by angle.
-    let aura_px = pixels(256, 384, |x, y| {
-        let d = crate::vines_model::hypot(x, y);
-        let a = (-((d - 0.82) / 0.16).powi(2)).exp() * smooth((d - 0.55) / 0.23) * (1.0 - smooth((d - 0.92) / 0.2));
-        let c = pastel((crate::vines_model::atan2(y, x) / (2.0 * PI) + 1.0) % 1.0, cream);
-        [c[0], c[1], c[2], a]
-    });
-    // Streak: white, alpha (1 − |x|)^1.25 · (1 − |y|)^3.1.
-    let streak_px = pixels(256, 64, |x, y| [255.0, 255.0, 255.0, (1.0 - x.abs()).powf(1.25) * (1.0 - y.abs()).powf(3.1)]);
-    // Rainbow streak: pastel along x, alpha exponents 1.2 / 3.4.
-    let rainbow_px = pixels(256, 64, |x, y| {
-        let c = pastel((x + 1.0) / 2.0, cream);
-        [c[0], c[1], c[2], (1.0 - x.abs()).powf(1.2) * (1.0 - y.abs()).powf(3.4)]
-    });
-    let [cr, cg, cb] = cream;
-    let mut textures = Vec::new();
-    for (w, h, px) in [(256, 384, Some(aura_px)), (256, 64, Some(streak_px)), (256, 64, Some(rainbow_px)), (64, 64, None)] {
-        let mut c = host.canvas(w, h);
-        match px {
-            Some(px) => c.put_image_data(&px),
-            None => {
-                // Glint: a radial core and two crossed soft bars, added.
-                c.set_fill(Paint::Radial {
-                    from: [32.0, 32.0, 0.0],
-                    to: [32.0, 32.0, 12.8],
-                    stops: vec![(0.0, "rgba(255,255,255,1)".into()), (0.38, format!("rgba({cr},{cg},{cb},0.5)")), (1.0, format!("rgba({cr},{cg},{cb},0)"))],
-                });
-                c.fill_rect(0.0, 0.0, 64.0, 64.0);
-                c.set_composite(Composite::Lighter);
-                for (half, thickness, alpha, vertical) in [(28.8, 1.4, 0.7, false), (19.2, 1.05, 0.48, true)] {
-                    let stops = vec![(0.0, "rgba(255,255,255,0)".into()), (0.5, format!("rgba(255,255,255,{alpha})")), (1.0, "rgba(255,255,255,0)".into())];
-                    if vertical {
-                        c.set_fill(Paint::Linear { from: [32.0, 32.0 - half], to: [32.0, 32.0 + half], stops });
-                        c.fill_rect(32.0 - thickness / 2.0, 32.0 - half, thickness, 2.0 * half);
-                    } else {
-                        c.set_fill(Paint::Linear { from: [32.0 - half, 32.0], to: [32.0 + half, 32.0], stops });
-                        c.fill_rect(32.0 - half, 32.0 - thickness / 2.0, 2.0 * half, thickness);
+    // The sprites, drawn once per device for a tone (`renderer::memo`).
+    let make = || {
+        // Aura: a 256×384 ring, pastel hue by angle.
+        let aura_px = pixels(256, 384, |x, y| {
+            let d = crate::vines_model::hypot(x, y);
+            let a = (-((d - 0.82) / 0.16).powi(2)).exp() * smooth((d - 0.55) / 0.23) * (1.0 - smooth((d - 0.92) / 0.2));
+            let c = pastel((crate::vines_model::atan2(y, x) / (2.0 * PI) + 1.0) % 1.0, cream);
+            [c[0], c[1], c[2], a]
+        });
+        // Streak: white, alpha (1 − |x|)^1.25 · (1 − |y|)^3.1.
+        let streak_px = pixels(256, 64, |x, y| [255.0, 255.0, 255.0, (1.0 - x.abs()).powf(1.25) * (1.0 - y.abs()).powf(3.1)]);
+        // Rainbow streak: pastel along x, alpha exponents 1.2 / 3.4.
+        let rainbow_px = pixels(256, 64, |x, y| {
+            let c = pastel((x + 1.0) / 2.0, cream);
+            [c[0], c[1], c[2], (1.0 - x.abs()).powf(1.2) * (1.0 - y.abs()).powf(3.4)]
+        });
+        let [cr, cg, cb] = cream;
+        let mut textures = Vec::new();
+        for (w, h, px) in [(256, 384, Some(aura_px)), (256, 64, Some(streak_px)), (256, 64, Some(rainbow_px)), (64, 64, None)] {
+            let mut c = host.canvas(w, h);
+            match px {
+                Some(px) => c.put_image_data(&px),
+                None => {
+                    // Glint: a radial core and two crossed soft bars, added.
+                    c.set_fill(Paint::Radial {
+                        from: [32.0, 32.0, 0.0],
+                        to: [32.0, 32.0, 12.8],
+                        stops: vec![(0.0, "rgba(255,255,255,1)".into()), (0.38, format!("rgba({cr},{cg},{cb},0.5)")), (1.0, format!("rgba({cr},{cg},{cb},0)"))],
+                    });
+                    c.fill_rect(0.0, 0.0, 64.0, 64.0);
+                    c.set_composite(Composite::Lighter);
+                    for (half, thickness, alpha, vertical) in [(28.8, 1.4, 0.7, false), (19.2, 1.05, 0.48, true)] {
+                        let stops = vec![(0.0, "rgba(255,255,255,0)".into()), (0.5, format!("rgba(255,255,255,{alpha})")), (1.0, "rgba(255,255,255,0)".into())];
+                        if vertical {
+                            c.set_fill(Paint::Linear { from: [32.0, 32.0 - half], to: [32.0, 32.0 + half], stops });
+                            c.fill_rect(32.0 - thickness / 2.0, 32.0 - half, thickness, 2.0 * half);
+                        } else {
+                            c.set_fill(Paint::Linear { from: [32.0 - half, 32.0], to: [32.0 + half, 32.0], stops });
+                            c.fill_rect(32.0 - half, 32.0 - thickness / 2.0, 2.0 * half, thickness);
+                        }
                     }
                 }
             }
+            // A CanvasTexture (flipY: the top row at v = 1), sRGB, trilinear.
+            let data = c.get_image_data();
+            let flipped: Vec<u8> = data.chunks_exact(4 * w as usize).rev().flatten().copied().collect();
+            textures.push(crate::renderer::upload(device, queue, &crate::material::mip_chain(&flipped, w, h, true), true));
         }
-        // A CanvasTexture (flipY: the top row at v = 1), sRGB, trilinear.
-        let data = c.get_image_data();
-        let flipped: Vec<u8> = data.chunks_exact(4 * w as usize).rev().flatten().copied().collect();
-        textures.push(r.texture_with(device, queue, &crate::material::mip_chain(&flipped, w, h, true), true, Wrap::Clamp, 1));
-    }
+        textures
+    };
+    let made = crate::renderer::memo(device, "shine sprites", 2, crate::renderer::key_of(pal.cream.map(f64::to_bits)), make);
+    let textures: Vec<_> = made.iter().map(|t| r.adopt_texture(t, Wrap::Clamp, 1)).collect();
 
-    let module =
-        device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("shine"), source: wgpu::ShaderSource::Wgsl(wgsl!("shine.wgsl").into()) });
+    let module = crate::effects::module(device, "shine", wgsl!("shine.wgsl"));
     let layout = bind_layout(device, "shine", &[Bind::Uniform, Bind::Texture, Bind::Sampler]);
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
         mag_filter: wgpu::FilterMode::Linear,

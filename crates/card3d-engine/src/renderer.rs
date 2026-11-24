@@ -526,6 +526,9 @@ fn core(device: &wgpu::Device, format: wgpu::TextureFormat, size: env::EnvSize) 
     })
 }
 
+/// A value `memo` made: its kind, its key, the value.
+type Made = (&'static str, u64, Rc<dyn std::any::Any>);
+
 /// A studio environment's inputs (`Environment::Studio`).
 type StudioKey = (Option<env::Look>, crate::quality::Quality, Option<[f32; 3]>);
 
@@ -538,6 +541,8 @@ pub(crate) struct DeviceCache {
     maps: Rc<crate::card::MapCache>,
     /// The last two studio environments made, the latest last.
     studio: RefCell<Vec<(StudioKey, wgpu::Texture)>>,
+    /// What `memo` made, by kind and key, the latest used last.
+    made: RefCell<Vec<Made>>,
 }
 
 thread_local! {
@@ -574,6 +579,57 @@ impl DeviceCache {
         }
         atlas
     }
+
+    fn get(&self, kind: &'static str, key: u64) -> Option<Rc<dyn std::any::Any>> {
+        let mut made = self.made.borrow_mut();
+        let i = made.iter().position(|e| e.0 == kind && e.1 == key)?;
+        let e = made.remove(i);
+        let value = e.2.clone();
+        made.push(e);
+        Some(value)
+    }
+
+    fn put(&self, kind: &'static str, keep: usize, key: u64, value: Rc<dyn std::any::Any>) {
+        let mut made = self.made.borrow_mut();
+        made.retain(|e| e.0 != kind || e.1 != key);
+        made.push((kind, key, value));
+        if made.iter().filter(|e| e.0 == kind).count() > keep {
+            let oldest = made.iter().position(|e| e.0 == kind).unwrap();
+            made.remove(oldest);
+        }
+    }
+}
+
+/// A `memo` key: the hash of what a value is made from (GPU objects hash by identity).
+pub(crate) fn key_of(of: impl std::hash::Hash) -> u64 {
+    use std::hash::Hasher;
+    let mut h = std::hash::DefaultHasher::new();
+    of.hash(&mut h);
+    h.finish()
+}
+
+/// What `make` makes from `key` (`key_of` its inputs) on `device`, made once while a card made on the
+/// device lives (`DeviceCache`; the next card is built while the last is shown): shader modules and
+/// pipelines (compiled once instead of per card; WebGL links its programs per module), and what
+/// effects draw from fixed inputs. The `keep` latest used of a `kind` stay. A value holding GPU objects
+/// its key hashes by identity keeps them too, so their identities aren't reused while it's kept.
+pub(crate) fn memo<T: 'static>(device: &wgpu::Device, kind: &'static str, keep: usize, key: u64, make: impl FnOnce() -> T) -> Rc<T> {
+    if let Some(v) = cached(device, kind, key) {
+        return v;
+    }
+    let v = Rc::new(make());
+    remember(device, kind, keep, key, v.clone());
+    v
+}
+
+/// `memo`'s value for `key`, if it has one.
+pub(crate) fn cached<T: 'static>(device: &wgpu::Device, kind: &'static str, key: u64) -> Option<Rc<T>> {
+    device_cache(device).get(kind, key).and_then(|v| v.downcast::<T>().ok())
+}
+
+/// Keeps `value` as `memo`'s for `key` (made apart: a custom shader is kept once it compiled).
+pub(crate) fn remember<T: 'static>(device: &wgpu::Device, kind: &'static str, keep: usize, key: u64, value: Rc<T>) {
+    device_cache(device).put(kind, keep, key, value);
 }
 
 /// The canvas's multisampled colour and depth, shared by renderers that draw one frame in turn
@@ -1145,6 +1201,29 @@ impl Renderer {
             Some(h) => h.pipelines.insert(key, pipeline),
             None => self.core.pipelines.borrow_mut().insert(key, pipeline),
         };
+    }
+
+    /// Makes every item's bind group and pipelines now, while the card is built (the last one still
+    /// shown), so that its first frame doesn't stall on them: the canvas's, and the half-float
+    /// targets' when the card draws into them (a glass card's buffers, a scene floor's reflection).
+    pub(crate) fn warm(&mut self, device: &wgpu::Device) {
+        let buffers = self.glass_passes.is_some() || self.offscreen;
+        for i in 0..self.items.len() {
+            if self.custom[i].is_some() {
+                continue;
+            }
+            self.prepare(device, i);
+            let mut key = self.gpu_items[i].as_ref().unwrap().key;
+            self.pipeline(device, key);
+            if buffers && !key.holo {
+                key.buffer = true;
+                self.pipeline(device, key);
+                if key.glass {
+                    key.side = Side::Back;
+                    self.pipeline(device, key);
+                }
+            }
+        }
     }
 
     fn prepare(&mut self, device: &wgpu::Device, i: usize) {

@@ -258,9 +258,13 @@ fn grow(r: &mut Renderer, device: &wgpu::Device, queue: &wgpu::Queue, host: &dyn
     let (leaves, strands) = model::select_vines(&ivy, o.density);
 
     // The atlas (canvas rows, flipped to GL's order: v = 0 first), mipmapped, linear data.
-    let atlas_px = leaf_atlas(host);
-    let flipped: Vec<u8> = atlas_px.as_chunks::<{ 4 * 256 }>().0.iter().rev().flatten().copied().collect();
-    let atlas = r.texture(device, queue, &crate::material::mip_chain(&flipped, 256, 384, false), false, crate::renderer::Wrap::Clamp);
+    // Drawn once per device (`renderer::memo`).
+    let atlas = crate::renderer::memo(device, "leaf atlas", 1, 0, || {
+        let atlas_px = leaf_atlas(host);
+        let flipped: Vec<u8> = atlas_px.as_chunks::<{ 4 * 256 }>().0.iter().rev().flatten().copied().collect();
+        crate::renderer::upload(device, queue, &crate::material::mip_chain(&flipped, 256, 384, false), false)
+    });
+    let atlas = r.adopt_texture(&atlas, crate::renderer::Wrap::Clamp, 1);
 
     // Stem ribbons: two vertices per node; z rescaled from the ivy slab's faces to this body's.
     let (mut stem_mesh, mut stem_extra) = (Mesh { positions: Vec::new(), normals: Vec::new(), uvs: Vec::new(), indices: Vec::new() }, Vec::<f32>::new());
@@ -346,8 +350,7 @@ fn grow(r: &mut Renderer, device: &wgpu::Device, queue: &wgpu::Queue, host: &dyn
         mipmap_filter: wgpu::MipmapFilterMode::Linear,
         ..Default::default()
     });
-    let module =
-        device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("vines"), source: wgpu::ShaderSource::Wgsl(wgsl!("vines.wgsl").into()) });
+    let module = crate::effects::module(device, "vines", wgsl!("vines.wgsl"));
     let layout = bind_layout(device, "vines", &[Bind::Uniform, Bind::Uniform, Bind::Texture, Bind::Texture, Bind::Sampler]);
     let atlas_view = r.texture_view(atlas).clone();
     let group = |uniform: &wgpu::Buffer, shadow: &wgpu::TextureView| {
@@ -395,9 +398,10 @@ fn grow(r: &mut Renderer, device: &wgpu::Device, queue: &wgpu::Queue, host: &dyn
     };
     let cast_group = group(&item_uniform([0.0; 4]), &dummy.create_view(&Default::default()));
     // The mip chain: one bilinear tap per texel of the level above.
-    let blit_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("leaf shadow mips"),
-        entries: &[
+    let blit_layout = crate::effects::layout(
+        device,
+        "leaf shadow mips",
+        &[
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::FRAGMENT,
@@ -415,27 +419,31 @@ fn grow(r: &mut Renderer, device: &wgpu::Device, queue: &wgpu::Queue, host: &dyn
                 count: None,
             },
         ],
-    });
-    let blit = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("leaf shadow mips"),
-        layout: Some(&device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[None, None, Some(&blit_layout)],
-            immediate_size: 0,
-        })),
-        vertex: wgpu::VertexState { module: &module, entry_point: Some("vs_blit"), buffers: &[], compilation_options: Default::default() },
-        fragment: Some(wgpu::FragmentState {
-            module: &module,
-            entry_point: Some("fs_blit"),
-            targets: &[Some(wgpu::ColorTargetState { format: SHADOW_FORMAT, blend: None, write_mask: wgpu::ColorWrites::ALL })],
-            compilation_options: Default::default(),
-        }),
-        primitive: Default::default(),
-        depth_stencil: None,
-        multisample: Default::default(),
-        multiview_mask: None,
-        cache: None,
-    });
+    );
+    let make_blit = || {
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("leaf shadow mips"),
+            layout: Some(&device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[None, None, Some(&blit_layout)],
+                immediate_size: 0,
+            })),
+            vertex: wgpu::VertexState { module: &module, entry_point: Some("vs_blit"), buffers: &[], compilation_options: Default::default() },
+            fragment: Some(wgpu::FragmentState {
+                module: &module,
+                entry_point: Some("fs_blit"),
+                targets: &[Some(wgpu::ColorTargetState { format: SHADOW_FORMAT, blend: None, write_mask: wgpu::ColorWrites::ALL })],
+                compilation_options: Default::default(),
+            }),
+            primitive: Default::default(),
+            depth_stencil: None,
+            multisample: Default::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        (blit_layout.clone(), module.clone(), pipeline)
+    };
+    let blit = crate::renderer::memo(device, "leaf shadow mips", 1, crate::renderer::key_of((&blit_layout, &module)), make_blit).2.clone();
     let bilinear =
         device.create_sampler(&wgpu::SamplerDescriptor { mag_filter: wgpu::FilterMode::Linear, min_filter: wgpu::FilterMode::Linear, ..Default::default() });
     let level = |k: u32| shadow_tex.create_view(&wgpu::TextureViewDescriptor { base_mip_level: k, mip_level_count: Some(1), ..Default::default() });

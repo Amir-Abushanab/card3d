@@ -536,6 +536,7 @@ impl CardRenderer {
         };
         r.tag(n, [ADDON, 0, 0, 0]);
         let staging = scene.and_then(|s| (s.finish)(&mut r, device, queue, host));
+        r.warm(device);
         let body = (options.print && !glass).then_some(body_mesh);
         let material = options.print.then_some(m);
         Ok(CardRenderer { renderer: r, frame, stickers, faces, shine, vines, staging, _surface: shared_surface, body, material })
