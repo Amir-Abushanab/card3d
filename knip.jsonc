@@ -37,8 +37,9 @@
       "entry": ["*.mjs", "*.ts", "ref/*.ts", "designs/*.ts"],
       // compare.mjs / ar-compare.mjs load vite through createRequire, and the local three.js archive's tests
       // run on this package's vitest (three-archive.mjs links its node_modules here). @three-engine/* is the
-      // archive's alias (three-archive.mjs), absent in a fresh clone.
-      "ignoreDependencies": ["vite", "vitest", "@three-engine/.+"],
+      // archive's alias (three-archive.mjs), absent in a fresh clone. playwright: compare.mjs, ar-compare.mjs and
+      // crates/card3d-web/web/fallback.test.mjs load it through createRequire too.
+      "ignoreDependencies": ["vite", "vitest", "playwright", "@three-engine/.+"],
     },
   },
   // @archive: exports the local three.js archive (.archive/three-engine, gitignored) imports from the live
