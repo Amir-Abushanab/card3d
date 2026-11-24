@@ -143,6 +143,8 @@ export interface EngineCard {
   build(kind: number, json: string, opts?: { fontFamily?: string }, a?: number, b?: number): Promise<unknown>;
   advance(now: number): number;
   render(): void;
+  /** Holds the animated stickers on their current frame (a paused or hidden card), or lets them go on. */
+  setPaused(paused: boolean): void;
   simulateDeviceLoss(): void;
   dispose(): void;
 }
@@ -186,3 +188,15 @@ export function loadDesignImages(
   assets?: EngineAssets | null,
 ): Promise<Map<string, ImageData | Uint8Array | string>>;
 export function loadEngine(backend: "webgpu" | "webgl"): Promise<unknown>;
+/**
+ * Starts downloading the build a card will most likely start on (and asking for a WebGPU adapter), so
+ * it doesn't wait for a design's fonts and images; returns that build. `createCard` calls it too.
+ */
+export function preloadEngine(force?: "webgpu" | "webgl"): "webgpu" | "webgl";
+/** Whether an earlier load showed WebGPU to be unsafe here (a failure this week, or a start that crashed the tab). */
+export function webgpuDistrusted(): boolean;
+/**
+ * Sets the "starting" mark for a WebGPU start on this page and holds it until `release(failed)` (the
+ * start confirmed or disposed; `true`: WebGPU failed, the mark becomes "failed").
+ */
+export function holdWebgpuStart(): (failed?: boolean) => void;

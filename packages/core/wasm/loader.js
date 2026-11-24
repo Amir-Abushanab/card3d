@@ -7,11 +7,12 @@
 //   loses its device or reports an error: the card moves to the WebGL build on a fresh canvas (a
 //   canvas that has had a WebGPU context can't get a WebGL one);
 // - the tab crashes while WebGPU starts (reported for some iOS 26 devices): JavaScript can't catch
-//   that, so a "starting" mark is kept in localStorage while WebGPU starts. It is cleared 2 s after
-//   the first frame, and also whenever the page is hidden or left normally (`pagehide`,
-//   `visibilitychange`), which a crashed tab never gets to do; it is set again if the page comes back
-//   before the start was confirmed. A load that finds the mark goes straight to WebGL, and so does
-//   every load for a week after a WebGPU failure.
+//   that, so a "starting" mark is kept in localStorage while WebGPU starts. It is cleared once the
+//   page's last start in flight is 2 s past its first frame (or disposed), and also whenever the page
+//   is hidden or left normally (`pagehide`, `visibilitychange`), which a crashed tab never gets to do;
+//   it is set again if the page comes back before its starts were confirmed. A load that finds the
+//   mark, with no start of its own in flight, goes straight to WebGL, and so does every load for a
+//   week after a WebGPU failure.
 //
 //   const card = await createCard(canvas, designJson, { onCanvas, onFallback, resolveUrl, fontFamily, stage });
 //   (`stage`: the engine's stage options { quality, fit, interactive, intro, reducedMotion,
@@ -50,7 +51,7 @@ function store() {
   }
 }
 
-export function mark(state) {
+function mark(state) {
   try {
     const s = store();
     if (state) s?.setItem(KEY, `${state}:${Date.now()}`);
@@ -60,17 +61,61 @@ export function mark(state) {
   }
 }
 
+function stored() {
+  try {
+    return store()?.getItem(KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * WebGPU starts in flight on this page, across every copy of this loader (separately bundled copies
+ * share it): while there are any, a "starting" mark is this page's own, not one a crashed load left
+ * (a second card on the page starts while the first is still unconfirmed).
+ */
+const starts = (globalThis[Symbol.for("card3d.webgpu-starts")] ??= { count: 0, listening: false });
+
+/** Clears a "starting" mark; a "failed" one stays. */
+const clearStarting = () => stored()?.startsWith("starting:") && mark(null);
+
+/**
+ * Sets the "starting" mark for a WebGPU start and holds it until the returned `release(failed)`: once
+ * the start is confirmed (2 s past its first frame) or disposed, or with `true` when WebGPU failed
+ * (then the mark is "failed", also after a release). The mark goes when the page's last start is
+ * released.
+ */
+export function holdWebgpuStart() {
+  if (!starts.listening && typeof document !== "undefined") {
+    starts.listening = true;
+    // A normal exit or hide proves the starts in flight didn't crash the tab (so far).
+    const hide = () => starts.count > 0 && clearStarting();
+    addEventListener("pagehide", hide);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") hide();
+      else if (starts.count > 0 && !stored()) mark("starting");
+    });
+  }
+  starts.count++;
+  mark("starting");
+  let held = true;
+  return (failed = false) => {
+    if (held) {
+      held = false;
+      starts.count--;
+      if (!failed && starts.count === 0) clearStarting();
+    }
+    if (failed) mark("failed");
+  };
+}
+
 /** Whether an earlier load showed WebGPU to be unsafe here. */
 export function webgpuDistrusted() {
-  let v = null;
-  try {
-    v = store()?.getItem(KEY) ?? null;
-  } catch {
-    return false;
-  }
+  const v = stored();
   if (!v) return false;
   const [state, at] = v.split(":");
   if (state === "starting") {
+    if (starts.count > 0) return false; // this page's own start, still unconfirmed
     // The last start never finished: the tab most likely crashed.
     mark("failed");
     return true;
@@ -81,19 +126,35 @@ export function webgpuDistrusted() {
 /** How long to wait for a WebGPU adapter before starting on WebGL instead (ms). */
 const ADAPTER_TIMEOUT_MS = 5000;
 
-export async function webgpuAvailable() {
-  if (!navigator.gpu) return false;
-  try {
-    // A request that never settles (seen with software GPUs under load) must not keep the card from
-    // starting: after a while it counts as no adapter.
-    let timer = 0;
-    const timeout = new Promise((r) => (timer = setTimeout(() => r(null), ADAPTER_TIMEOUT_MS)));
-    const adapter = await Promise.race([navigator.gpu.requestAdapter(), timeout]);
-    clearTimeout(timer);
-    return !!adapter;
-  } catch {
-    return false;
-  }
+let adapter = null;
+/** Whether WebGPU has an adapter here: asked once per page, every card shares the answer. */
+export function webgpuAvailable() {
+  return (adapter ??= (async () => {
+    if (!navigator.gpu) return false;
+    try {
+      // A request that never settles (seen with software GPUs under load) must not keep the card from
+      // starting: after a while it counts as no adapter.
+      let timer = 0;
+      const timeout = new Promise((r) => (timer = setTimeout(() => r(null), ADAPTER_TIMEOUT_MS)));
+      const found = await Promise.race([navigator.gpu.requestAdapter(), timeout]);
+      clearTimeout(timer);
+      return !!found;
+    } catch {
+      return false;
+    }
+  })());
+}
+
+/**
+ * Starts downloading the build a card will most likely start on (WebGPU where the browser has it and
+ * it isn't distrusted here, else WebGL) and asking for an adapter, so neither waits for a design's
+ * fonts and images. Returns that build. `createCard` calls it; a page can call it earlier.
+ */
+export function preloadEngine(force) {
+  const likely = force ?? (typeof navigator !== "undefined" && navigator.gpu && !webgpuDistrusted() ? "webgpu" : "webgl");
+  if (!force && likely === "webgpu") void webgpuAvailable();
+  loadEngine(likely).catch(() => {}); // a card that needs it retries and reports the failure
+  return likely;
 }
 
 const modules = {};
@@ -102,8 +163,9 @@ export async function loadEngine(backend) {
   if (!modules[backend]) {
     modules[backend] = (async () => {
       try {
-        // Literal paths, so bundlers emit each build (and its wasm) as chunks and assets.
-        const mod = await (backend === "webgpu" ? import("./pkg/card3d_web.js") : import("./pkg-webgl/card3d_web.js"));
+        // Literal paths, so bundlers emit each build (and its wasm) as chunks and assets; one import()
+        // each, so a bundler preloads only the build that is asked for.
+        const mod = backend === "webgpu" ? await import("./pkg/card3d_web.js") : await import("./pkg-webgl/card3d_web.js");
         await mod.default();
         return mod;
       } catch (e) {
@@ -291,8 +353,18 @@ function imageSources(design) {
 /** Whether a mask `src` is an SVG (`toProcessedLiquidMetal`: by its name or a data URL's type). */
 const isSvg = (src) => /\.svg([?#].*)?$/i.test(src) || src.startsWith("data:image/svg+xml");
 
-/** A WebGL 2 context for reading images back as uploaded (see `straightPixels`); one per page. */
+/**
+ * A WebGL 2 context for reading images back as uploaded (see `straightPixels`), kept while images
+ * decode (`readbackUsers`) and then let go: it counts against the browser's per-page context limit
+ * like a card's own.
+ */
 let readback = null;
+let readbackUsers = 0;
+const releaseReadback = () => {
+  if (--readbackUsers > 0 || !readback) return;
+  readback.getExtension("WEBGL_lose_context")?.loseContext();
+  readback = null;
+};
 
 /**
  * An image's pixels exactly as the three.js engine uploads it (`texImage2D` without premultiplying):
@@ -376,6 +448,75 @@ function loadEnvironment(url) {
 }
 
 /**
+ * Decoded design images by (URL, longest side, kind), least recently used first: cards share one
+ * decode of an image, and a card that rebuilds (Card Studio does on every edit) doesn't decode its
+ * images again. A page-wide registry, as `environments`; settled images are kept up to a budget.
+ */
+const decoded = (globalThis[Symbol.for("card3d.design-images")] ??= new Map());
+const DECODED_BUDGET = { bytes: 64 * 2 ** 20, entries: 24 };
+
+function trimDecoded() {
+  let bytes = 0;
+  for (const e of decoded.values()) bytes += e.bytes;
+  let entries = decoded.size;
+  for (const [key, e] of decoded) {
+    if (bytes <= DECODED_BUDGET.bytes && entries <= DECODED_BUDGET.entries) break;
+    if (!e.bytes) continue; // still decoding
+    decoded.delete(key);
+    bytes -= e.bytes;
+    entries--;
+  }
+}
+
+/** One design image's pixels (`loadDesignImages`), from `decoded` when another load already has them. */
+function designImage(src, url, maxSide, kind) {
+  const key = `${kind ?? "image"} ${maxSide} ${url}`;
+  const hit = decoded.get(key);
+  if (hit) {
+    decoded.delete(key);
+    decoded.set(key, hit);
+    return hit.pixels;
+  }
+  const entry = { pixels: decodeDesignImage(src, url, maxSide, kind), bytes: 0 };
+  decoded.set(key, entry);
+  entry.pixels.then(
+    (img) => {
+      entry.bytes = img.data.byteLength;
+      trimDecoded();
+    },
+    () => decoded.get(key) === entry && decoded.delete(key),
+  );
+  return entry.pixels;
+}
+
+async function decodeDesignImage(src, url, maxSide, kind) {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = url;
+  await img.decode();
+  let w = img.naturalWidth || img.width;
+  let h = img.naturalHeight || img.height;
+  if (kind === "mask" && isSvg(src)) {
+    // `toProcessedLiquidMetal` draws an SVG at 4096 px on its longer side.
+    [w, h] = w > h ? [4096, 4096 / (w / h)] : [4096 * (w / h), 4096];
+    const c = new OffscreenCanvas(Math.trunc(w), Math.trunc(h));
+    const ctx = c.getContext("2d");
+    ctx.drawImage(img, 0, 0, w, h);
+    return ctx.getImageData(0, 0, c.width, c.height);
+  }
+  const k = Math.min(1, maxSide / Math.max(w, h, 1));
+  const cw = Math.max(1, Math.round(w * k));
+  const ch = Math.max(1, Math.round(h * k));
+  // As three: an image that fits is used as decoded; a larger one is downscaled on a canvas.
+  const straight = k === 1 ? straightPixels(img, w, h) : null;
+  if (straight) return straight;
+  const ctx = new OffscreenCanvas(cw, ch).getContext("2d");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, cw, ch);
+  return ctx.getImageData(0, 0, cw, ch);
+}
+
+/**
  * Loads and decodes a design's images as the three.js engine did (`loadImage`; artwork through
  * `designTexture`: downscaled to ≤ 1280 px with high-quality smoothing). Keys: artwork by `src`,
  * full-size images by `full:` + `src`. A failed image is left out (the engine skips that layer).
@@ -398,43 +539,21 @@ export async function loadDesignImages(design, resolveUrl = (s) => s, environmen
           }
         })()
       : null;
-  await Promise.all([
-    environment,
-    ...[...imageSources(design)].map(async ([key, [src, maxSide, kind]]) => {
-      try {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.src = resolveUrl(src);
-        await img.decode();
-        let w = img.naturalWidth || img.width;
-        let h = img.naturalHeight || img.height;
-        if (kind === "mask" && isSvg(src)) {
-          // `toProcessedLiquidMetal` draws an SVG at 4096 px on its longer side.
-          [w, h] = w > h ? [4096, 4096 / (w / h)] : [4096 * (w / h), 4096];
-          const c = new OffscreenCanvas(Math.trunc(w), Math.trunc(h));
-          const ctx = c.getContext("2d");
-          ctx.drawImage(img, 0, 0, w, h);
-          images.set(key, ctx.getImageData(0, 0, c.width, c.height));
-          return;
+  readbackUsers++;
+  try {
+    await Promise.all([
+      environment,
+      ...[...imageSources(design)].map(async ([key, [src, maxSide, kind]]) => {
+        try {
+          images.set(key, await designImage(src, resolveUrl(src), maxSide, kind));
+        } catch (e) {
+          console.warn(`[card3d] image failed to load: ${String(src).slice(0, 80)}`, e);
         }
-        const k = Math.min(1, maxSide / Math.max(w, h, 1));
-        const cw = Math.max(1, Math.round(w * k));
-        const ch = Math.max(1, Math.round(h * k));
-        // As three: an image that fits is used as decoded; a larger one is downscaled on a canvas.
-        const straight = k === 1 ? straightPixels(img, w, h) : null;
-        if (straight) {
-          images.set(key, straight);
-          return;
-        }
-        const ctx = new OffscreenCanvas(cw, ch).getContext("2d");
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(img, 0, 0, cw, ch);
-        images.set(key, ctx.getImageData(0, 0, cw, ch));
-      } catch (e) {
-        console.warn(`[card3d] image failed to load: ${String(src).slice(0, 80)}`, e);
-      }
-    }),
-  ]);
+      }),
+    ]);
+  } finally {
+    releaseReadback();
+  }
   return images;
 }
 
@@ -472,19 +591,27 @@ export async function createCard(
     stage: options = {},
   } = {},
 ) {
+  // The engine downloads (and the adapter is found) while the design's images load.
+  const likely = preloadEngine(force);
+  const [images, available] = await Promise.all([
+    loadDesignImages(JSON.parse(design), resolveUrl, environmentUrl, assets),
+    force || likely === "webgl" ? null : webgpuAvailable(),
+  ]);
   /** The design on screen, replayed on a fall-over. */
-  let current = { design, images: await loadDesignImages(JSON.parse(design), resolveUrl, environmentUrl, assets), fontFamily };
+  let current = { design, images, fontFamily };
   const slot = { rotation: [0, 0, 0], lift: 0, orbit: [0, 0, 1], distance: NaN };
-  let backend = force ?? (webgpuDistrusted() ? "webgl" : (await webgpuAvailable()) ? "webgpu" : "webgl");
+  let backend = force ?? (likely === "webgpu" && available ? "webgpu" : "webgl");
   let stage = null;
   let drawn = false;
-  /** The WebGPU start has run 2 s past its first frame without failing. */
-  let confirmed = false;
+  /** Releases this card's "starting" mark (`holdWebgpuStart`). */
+  let release = () => {};
   let switching = null;
 
   // Animated GIF stickers: the page decodes them and sends each frame to the engine. The last frame of
   // each is kept for a stage that replaces this one (a fall-over, a restored context).
   let players = [];
+  /** A paused card's stickers hold their frame (`setPaused`). */
+  let stickersPaused = false;
   let stickersReady = Promise.resolve();
   const lastFrames = new Map();
   const startStickers = () => {
@@ -499,15 +626,15 @@ export async function createCard(
     }
     decals.forEach((d, i) => {
       if (!isGifSource(d?.src)) return;
-      players.push(
-        playGif(resolveUrl(d.src), (frame) => {
-          lastFrames.set(i, frame);
-          if (stage && !switching && !lost) {
-            stage.setStickerFrame(i, frame);
-            onStickerFrame?.();
-          }
-        }),
-      );
+      const player = playGif(resolveUrl(d.src), (frame) => {
+        lastFrames.set(i, frame);
+        if (stage && !switching && !lost) {
+          stage.setStickerFrame(i, frame);
+          onStickerFrame?.();
+        }
+      });
+      if (stickersPaused) player.pause();
+      players.push(player);
     });
     stickersReady = Promise.all(players.map((p) => p.firstFrame)).then(() => undefined);
   };
@@ -581,15 +708,13 @@ export async function createCard(
   }
 
   if (backend === "webgpu") {
-    mark("starting");
+    release = holdWebgpuStart();
     try {
       stage = await createStage("webgpu", canvas, options, current, slot);
     } catch (e) {
-      if (isLoadError(e)) {
-        mark(null); // WebGPU didn't fail: the network did
-        throw e;
-      }
-      mark("failed");
+      // A part that didn't download is the network's failure, not WebGPU's.
+      release(!isLoadError(e));
+      if (isLoadError(e)) throw e;
       await startWebgl(`WebGPU failed to start: ${e?.message ?? e}`);
     }
   } else {
@@ -599,23 +724,10 @@ export async function createCard(
   startStickers();
 
   const failOver = (why) => {
-    mark("failed");
+    release(true);
     switching ??= startWebgl(why).finally(() => (switching = null));
   };
   if (backend === "webgpu") {
-    // A normal exit or hide proves the start didn't crash the tab (so far): don't leave the mark.
-    const healthy = () => backend === "webgpu" && !stage?.failure();
-    const onHide = () => healthy() && mark(null);
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") onHide();
-      else if (healthy() && !confirmed) mark("starting");
-    };
-    addEventListener("pagehide", onHide);
-    document.addEventListener("visibilitychange", onVisibility);
-    cleanup.push(
-      () => removeEventListener("pagehide", onHide),
-      () => document.removeEventListener("visibilitychange", onVisibility),
-    );
     watch = setInterval(() => {
       const failure = stage?.failure();
       if (failure) failOver(failure);
@@ -748,11 +860,16 @@ export async function createCard(
       if (backend === "webgpu" && !drawn) {
         drawn = true;
         setTimeout(() => {
-          if (backend === "webgpu" && !stage?.failure()) {
-            confirmed = true;
-            mark(null);
-          }
+          if (backend === "webgpu" && !stage?.failure()) release();
         }, GOOD_MS);
+      }
+    },
+    /** Holds the animated stickers on their current frame (a paused or hidden card), or lets them go on. */
+    setPaused(paused) {
+      stickersPaused = paused;
+      for (const p of players) {
+        if (paused) p.pause();
+        else p.resume();
       }
     },
     /** Testing only: as if the GPU reset (WebGPU) — the card should move to WebGL. */
@@ -765,7 +882,7 @@ export async function createCard(
       for (const p of players) p.stop();
       players = [];
       for (const f of cleanup.splice(0)) f();
-      if (backend === "webgpu" && drawn && !stage?.failure()) mark(null);
+      release(backend === "webgpu" && !!stage?.failure());
       const s = stage;
       stage = null;
       try {

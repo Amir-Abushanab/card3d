@@ -3,7 +3,7 @@
 // way). A module of its own so pages without a marquee don't carry it: packages/core/src/marquee/mount.ts
 // imports it.
 
-import { BUILD, GOOD_MS, OP, freshCanvas, isLoadError, loadDesignImages, loadEngine, mark, webgpuAvailable, webgpuDistrusted } from "./loader.js";
+import { BUILD, GOOD_MS, OP, freshCanvas, holdWebgpuStart, isLoadError, loadDesignImages, loadEngine, preloadEngine, webgpuAvailable } from "./loader.js";
 
 /** The page's view of a wasm `CardStage` made for the marquee (`WasmMarqueeStage`). */
 function marqueeStage(raw) {
@@ -36,12 +36,14 @@ export async function createMarquee(
   canvas,
   { force, stage: options = {}, onCanvas, onRestart, onFallback, onContextLost, resolveUrl = (s) => s, assets = null } = {},
 ) {
-  let backend = force ?? (webgpuDistrusted() ? "webgl" : (await webgpuAvailable()) ? "webgpu" : "webgl");
+  const likely = preloadEngine(force);
+  let backend = force ?? (likely === "webgpu" && (await webgpuAvailable()) ? "webgpu" : "webgl");
   let stage = null;
   let switching = null;
   let lost = false;
   let drawn = false;
-  let confirmed = false;
+  /** Releases the marquee's "starting" mark (`holdWebgpuStart`). */
+  let release = () => {};
   let watch = 0;
   let disposed = false;
   const cleanup = [];
@@ -117,38 +119,24 @@ export async function createMarquee(
     }
   };
   const failOver = (why) => {
-    mark("failed");
+    release(true);
     switching ??= startWebgl(why).finally(() => (switching = null));
   };
 
   if (backend === "webgpu") {
-    mark("starting");
+    release = holdWebgpuStart();
     try {
       stage = await make("webgpu", options);
     } catch (e) {
-      if (isLoadError(e)) {
-        mark(null);
-        throw e;
-      }
-      mark("failed");
+      // A part that didn't download is the network's failure, not WebGPU's.
+      release(!isLoadError(e));
+      if (isLoadError(e)) throw e;
       await startWebgl(`WebGPU failed to start: ${e?.message ?? e}`);
     }
   } else {
     await startWebgl(null);
   }
   if (backend === "webgpu") {
-    const healthy = () => backend === "webgpu" && !stage?.failure();
-    const onHide = () => healthy() && mark(null);
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") onHide();
-      else if (healthy() && !confirmed) mark("starting");
-    };
-    addEventListener("pagehide", onHide);
-    document.addEventListener("visibilitychange", onVisibility);
-    cleanup.push(
-      () => removeEventListener("pagehide", onHide),
-      () => document.removeEventListener("visibilitychange", onVisibility),
-    );
     watch = setInterval(() => {
       const failure = stage?.failure();
       if (failure) failOver(failure);
@@ -202,10 +190,7 @@ export async function createMarquee(
       if (backend === "webgpu" && !drawn) {
         drawn = true;
         setTimeout(() => {
-          if (backend === "webgpu" && !stage?.failure()) {
-            confirmed = true;
-            mark(null);
-          }
+          if (backend === "webgpu" && !stage?.failure()) release();
         }, GOOD_MS);
       }
     },
@@ -217,7 +202,7 @@ export async function createMarquee(
       disposed = true;
       clearInterval(watch);
       for (const f of cleanup.splice(0)) f();
-      if (backend === "webgpu" && drawn && !stage?.failure()) mark(null);
+      release(backend === "webgpu" && !!stage?.failure());
       const s = stage;
       stage = null;
       free(s);
