@@ -632,8 +632,8 @@ pub(crate) fn remember<T: 'static>(device: &wgpu::Device, kind: &'static str, ke
     device_cache(device).put(kind, keep, key, value);
 }
 
-/// The canvas's multisampled colour and depth, shared by renderers that draw one frame in turn
-/// (`Renderer::render_layer`), with the frame's projection.
+/// The canvas's multisampled colour and depth for a frame several renderers draw
+/// (`Renderer::render_layers`), with the frame's projection.
 pub struct Layers {
     pub width: u32,
     pub height: u32,
@@ -671,6 +671,8 @@ pub struct Renderer {
     cache: Rc<DeviceCache>,
     pub(crate) frame_buffer: wgpu::Buffer,
     frame_bind_group: wgpu::BindGroup,
+    /// The environment `frame_bind_group` binds.
+    atlas: wgpu::Texture,
     pub(crate) meshes: Vec<GpuMesh>,
     pub(crate) textures: Vec<Texture>,
     pub(crate) white: TextureId,
@@ -777,11 +779,11 @@ pub struct PointLight {
     pub decay: f32,
 }
 
-/// Where `draw_pass` draws: the canvas (through the MSAA target; or one layer of a frame several
-/// renderers draw, and whether it is the first), or one of the glass buffers.
+/// Where `draw_pass` draws: the canvas (through the MSAA target), one of the glass buffers, or another
+/// view's targets.
 #[derive(Clone, Copy)]
 pub(crate) enum PassTarget<'a> {
-    Canvas(&'a wgpu::TextureView, Option<(&'a Layers, bool)>),
+    Canvas(&'a wgpu::TextureView),
     GlassMain,
     GlassBack,
     /// Another view of the scene (a scene floor's reflection): colour (`GLASS_BUFFER_FORMAT`) and depth.
@@ -899,6 +901,7 @@ impl Renderer {
             cache,
             frame_buffer,
             frame_bind_group,
+            atlas,
             meshes: Vec::new(),
             textures: Vec::new(),
             white: TextureId(0),
@@ -1075,6 +1078,7 @@ impl Renderer {
     /// Lights the card from another environment of the same size (a frame's new lighting preset).
     pub fn set_environment(&mut self, device: &wgpu::Device, atlas: &wgpu::Texture) {
         self.frame_bind_group = frame_bind_group(device, &self.core, &self.frame_buffer, atlas);
+        self.atlas = atlas.clone();
     }
 
     /// The frame bind group's layout (group 0 of every pipeline), for custom pipelines.
@@ -1532,23 +1536,58 @@ impl Renderer {
     /// from `cam`.
     pub fn render_with(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, target: &wgpu::TextureView, width: u32, height: u32, model: Mat4, cam: &Camera) {
         let proj = Self::projection(width as f32 / height as f32);
-        self.render_frame(device, queue, target, width, height, model, cam, proj, None);
+        self.render_frame(device, queue, target, width, height, model, cam, proj);
     }
 
-    /// Draws the card as one layer of a frame several renderers draw in turn into `layers` (resolved
-    /// into `target` each time): the first clears it (to transparent), the others draw over it, depth
-    /// tested against what is there.
-    pub fn render_layer(
-        &mut self,
+    /// Draws several renderers' cards (each with its world transform) into one frame (the marquee),
+    /// in order: every card's uniforms and its own passes first (a glass card's buffers), then all of
+    /// them in one pass over `layers`, resolved into `target` once, each depth tested against those
+    /// before it. Cards whose frame uniform and environment are the same share the first one's.
+    pub fn render_layers(
+        cards: &mut [(&mut Renderer, Mat4)],
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         target: &wgpu::TextureView,
         layers: &Layers,
-        first: bool,
-        model: Mat4,
         cam: &Camera,
     ) {
-        self.render_frame(device, queue, target, layers.width, layers.height, model, cam, layers.proj, Some((layers, first)));
+        let mut draws = Vec::with_capacity(cards.len());
+        let mut first: Option<(FrameUniform, wgpu::Texture)> = None;
+        for (k, (r, model)) in cards.iter_mut().enumerate() {
+            let (order, glass, frame) = r.prepare_frame(device, queue, layers.width, layers.height, *model, cam, layers.proj);
+            let shares = first.as_ref().is_some_and(|(f, atlas)| bytemuck::bytes_of(f) == bytemuck::bytes_of(&frame) && *atlas == r.atlas);
+            if !shares {
+                queue.write_buffer(&r.frame_buffer, 0, bytemuck::bytes_of(&frame));
+            }
+            if k == 0 {
+                first = Some((frame, r.atlas.clone()));
+            }
+            let glass = glass.map(|gi| (gi, GlassBuffer::Main));
+            let keys = r.keys(device, &order, glass, false);
+            draws.push((order, glass, keys, if shares { 0 } else { k }));
+        }
+        let mut encoder = device.create_command_encoder(&Default::default());
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("cards"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &layers.msaa,
+                    resolve_target: Some(target),
+                    depth_slice: None,
+                    ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Discard },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &layers.depth,
+                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Discard }),
+                    stencil_ops: None,
+                }),
+                ..Default::default()
+            });
+            for ((r, _), (order, glass, keys, frame)) in cards.iter().zip(&draws) {
+                r.record(&mut pass, order, keys, *glass, false, &cards[*frame].0.frame_bind_group);
+            }
+        }
+        queue.submit([encoder.finish()]);
     }
 
     fn render_frame(
@@ -1561,9 +1600,8 @@ impl Renderer {
         model: Mat4,
         cam: &Camera,
         proj: Mat4,
-        layer: Option<(&Layers, bool)>,
     ) {
-        if layer.is_none() && self.targets.as_ref().map(|t| (t.0, t.1)) != Some((width, height)) {
+        if self.targets.as_ref().map(|t| (t.0, t.1)) != Some((width, height)) {
             let make = |format, label| {
                 device
                     .create_texture(&wgpu::TextureDescriptor {
@@ -1580,6 +1618,28 @@ impl Renderer {
             };
             self.targets = Some((width, height, make(self.core.format, "msaa colour"), make(wgpu::TextureFormat::Depth32Float, "depth")));
         }
+        let (order, glass_item, frame) = self.prepare_frame(device, queue, width, height, model, cam, proj);
+        queue.write_buffer(&self.frame_buffer, 0, bytemuck::bytes_of(&frame));
+        let clear = match self.background {
+            Some(c) => wgpu::Color { r: c[0] as f64, g: c[1] as f64, b: c[2] as f64, a: 1.0 },
+            None => wgpu::Color::TRANSPARENT,
+        };
+        self.draw_pass(device, queue, PassTarget::Canvas(target), clear, &order, glass_item.map(|gi| (gi, GlassBuffer::Main)));
+    }
+
+    /// Everything a frame needs before the canvas's pass: the items' uniforms and order, a scene's
+    /// passes, a glass card's buffer passes. Returns the order, the glass item and the canvas's frame
+    /// uniform (for the caller to write: the passes leave `frame_buffer` as they need it).
+    fn prepare_frame(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        width: u32,
+        height: u32,
+        model: Mat4,
+        cam: &Camera,
+        proj: Mat4,
+    ) -> (Vec<usize>, Option<usize>, FrameUniform) {
         let view = cam.view32();
         let eye = cam.eye32();
         let pass_frame = PassFrame { camera: *cam, proj, model, width, height };
@@ -1611,32 +1671,18 @@ impl Renderer {
                 e.write(queue, model, cam);
             }
         }
-        queue.write_buffer(&self.frame_buffer, 0, bytemuck::bytes_of(&frame));
 
         // A glass body: its two buffer passes first (the `glass` chunk's).
         if let (Some(item), Some(run)) = (glass_item, self.glass_passes) {
             run(self, device, queue, &GlassFrame { item, order: &order, frame, pass_frame, view, eye }, &mut passes);
         }
         self.frame_passes = passes;
-        let clear = match self.background.filter(|_| layer.is_none()) {
-            Some(c) => wgpu::Color { r: c[0] as f64, g: c[1] as f64, b: c[2] as f64, a: 1.0 },
-            None => wgpu::Color::TRANSPARENT,
-        };
-        self.draw_pass(device, queue, PassTarget::Canvas(target, layer), clear, &order, glass_item.map(|gi| (gi, GlassBuffer::Main)));
+        (order, glass_item, frame)
     }
 
-    /// Draws `list` (already in draw order) into one target, in its own submission. `glass`: the glass
-    /// item and the buffer it refracts in this pass (the main buffer pass draws its back faces).
-    pub(crate) fn draw_pass(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        target: PassTarget<'_>,
-        clear: wgpu::Color,
-        list: &[usize],
-        glass: Option<(usize, GlassBuffer)>,
-    ) {
-        let buffer = !matches!(target, PassTarget::Canvas(..));
+    /// The pipeline keys `list` draws with into the canvas or (`buffer`) a half-float target, each
+    /// pipeline made if it isn't yet; `None` for custom items.
+    fn keys(&mut self, device: &wgpu::Device, list: &[usize], glass: Option<(usize, GlassBuffer)>, buffer: bool) -> Vec<Option<PipelineKey>> {
         let keys: Vec<Option<PipelineKey>> = list
             .iter()
             .map(|&i| {
@@ -1652,17 +1698,24 @@ impl Renderer {
         for k in keys.iter().flatten() {
             self.pipeline(device, *k);
         }
-        // A layer after the first keeps what the earlier layers drew (colour and depth).
-        let (mut load, mut store) = (wgpu::LoadOp::Clear(clear), None);
+        keys
+    }
+
+    /// Draws `list` (already in draw order) into one target, in its own submission. `glass`: the glass
+    /// item and the buffer it refracts in this pass (the main buffer pass draws its back faces).
+    pub(crate) fn draw_pass(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        target: PassTarget<'_>,
+        clear: wgpu::Color,
+        list: &[usize],
+        glass: Option<(usize, GlassBuffer)>,
+    ) {
+        let buffer = !matches!(target, PassTarget::Canvas(..));
+        let keys = self.keys(device, list, glass, buffer);
         let (colour, resolve, depth) = match target {
-            PassTarget::Canvas(view, Some((layers, first))) => {
-                if !first {
-                    load = wgpu::LoadOp::Load;
-                }
-                store = Some(wgpu::StoreOp::Store);
-                (&layers.msaa, Some(view), &layers.depth)
-            }
-            PassTarget::Canvas(view, None) => {
+            PassTarget::Canvas(view) => {
                 let (_, _, msaa, depth) = self.targets.as_ref().unwrap();
                 (msaa, Some(view), depth)
             }
@@ -1680,60 +1733,74 @@ impl Renderer {
                     view: colour,
                     resolve_target: resolve,
                     depth_slice: None,
-                    ops: wgpu::Operations { load, store: store.unwrap_or(if resolve.is_some() { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store }) },
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(clear),
+                        store: if resolve.is_some() { wgpu::StoreOp::Discard } else { wgpu::StoreOp::Store },
+                    },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: depth,
-                    depth_ops: Some(wgpu::Operations {
-                        load: if matches!(load, wgpu::LoadOp::Load) { wgpu::LoadOp::Load } else { wgpu::LoadOp::Clear(1.0) },
-                        store: store.unwrap_or(wgpu::StoreOp::Discard),
-                    }),
+                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Discard }),
                     stencil_ops: None,
                 }),
                 ..Default::default()
             });
-            let shared = self.core.pipelines.borrow();
-            pass.set_bind_group(0, &self.frame_bind_group, &[]);
-            for (&i, key) in list.iter().zip(&keys) {
-                let it = &self.items[i];
-                let m = &self.meshes[it.mesh.0];
-                let Some(key) = key else {
-                    // A custom item: its own pipeline and bind group 1, the frame's group 0.
-                    let c = self.custom[i].as_ref().unwrap();
-                    let range = c.range.clone().unwrap_or(0..m.count);
-                    if range.is_empty() || c.instances == 0 {
-                        continue;
-                    }
-                    pass.set_bind_group(0, &self.frame_bind_group, &[]);
-                    pass.set_pipeline(if buffer { c.buffer_pipeline.as_ref().unwrap() } else { &c.pipeline });
-                    pass.set_bind_group(1, &*c.bind_group, &[]);
-                    pass.set_vertex_buffer(0, m.vertices.slice(..));
-                    if let Some(extra) = &c.extra {
-                        pass.set_vertex_buffer(1, extra.slice(..));
-                    }
-                    pass.set_index_buffer(m.indices.slice(..), wgpu::IndexFormat::Uint32);
-                    pass.draw_indexed(range, 0, 0..c.instances);
-                    continue;
-                };
-                let g = self.gpu_items[i].as_ref().unwrap();
-                let (frame_group, pipeline) = match (&self.holo_gpu, key.holo) {
-                    (Some(h), true) => (&h.frame_bind_group, &h.pipelines[key]),
-                    _ => (&self.frame_bind_group, &shared[key]),
-                };
-                pass.set_bind_group(0, frame_group, &[]);
-                pass.set_pipeline(pipeline);
-                pass.set_bind_group(1, &g.bind_group, &[self.offset(i)]);
-                if key.glass {
-                    let t = self.glass_gpu.as_ref().and_then(|g| g.targets.as_ref()).expect("glass buffers");
-                    let back = glass.is_some_and(|(gi, b)| gi == i && b == GlassBuffer::Back);
-                    pass.set_bind_group(2, if back { &t.6 } else { &t.5 }, &[]);
-                }
-                pass.set_vertex_buffer(0, m.vertices.slice(..));
-                pass.set_index_buffer(m.indices.slice(..), wgpu::IndexFormat::Uint32);
-                pass.draw_indexed(0..m.count, 0, 0..1);
-            }
+            self.record(&mut pass, list, &keys, glass, buffer, &self.frame_bind_group);
         }
         queue.submit([encoder.finish()]);
+    }
+
+    /// Records `list` into `pass` with its `keys` (`keys`), group 0 from `frame` (a frame bind group
+    /// holding the same values as the renderer's own).
+    fn record(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        list: &[usize],
+        keys: &[Option<PipelineKey>],
+        glass: Option<(usize, GlassBuffer)>,
+        buffer: bool,
+        frame: &wgpu::BindGroup,
+    ) {
+        let shared = self.core.pipelines.borrow();
+        pass.set_bind_group(0, frame, &[]);
+        for (&i, key) in list.iter().zip(keys) {
+            let it = &self.items[i];
+            let m = &self.meshes[it.mesh.0];
+            let Some(key) = key else {
+                // A custom item: its own pipeline and bind group 1, the frame's group 0.
+                let c = self.custom[i].as_ref().unwrap();
+                let range = c.range.clone().unwrap_or(0..m.count);
+                if range.is_empty() || c.instances == 0 {
+                    continue;
+                }
+                pass.set_bind_group(0, frame, &[]);
+                pass.set_pipeline(if buffer { c.buffer_pipeline.as_ref().unwrap() } else { &c.pipeline });
+                pass.set_bind_group(1, &*c.bind_group, &[]);
+                pass.set_vertex_buffer(0, m.vertices.slice(..));
+                if let Some(extra) = &c.extra {
+                    pass.set_vertex_buffer(1, extra.slice(..));
+                }
+                pass.set_index_buffer(m.indices.slice(..), wgpu::IndexFormat::Uint32);
+                pass.draw_indexed(range, 0, 0..c.instances);
+                continue;
+            };
+            let g = self.gpu_items[i].as_ref().unwrap();
+            let (frame_group, pipeline) = match (&self.holo_gpu, key.holo) {
+                (Some(h), true) => (&h.frame_bind_group, &h.pipelines[key]),
+                _ => (frame, &shared[key]),
+            };
+            pass.set_bind_group(0, frame_group, &[]);
+            pass.set_pipeline(pipeline);
+            pass.set_bind_group(1, &g.bind_group, &[self.offset(i)]);
+            if key.glass {
+                let t = self.glass_gpu.as_ref().and_then(|g| g.targets.as_ref()).expect("glass buffers");
+                let back = glass.is_some_and(|(gi, b)| gi == i && b == GlassBuffer::Back);
+                pass.set_bind_group(2, if back { &t.6 } else { &t.5 }, &[]);
+            }
+            pass.set_vertex_buffer(0, m.vertices.slice(..));
+            pass.set_index_buffer(m.indices.slice(..), wgpu::IndexFormat::Uint32);
+            pass.draw_indexed(0..m.count, 0, 0..1);
+        }
     }
 }
 

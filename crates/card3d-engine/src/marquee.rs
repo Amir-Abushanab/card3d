@@ -617,14 +617,19 @@ impl Marquee for MarqueeState {
             queue.submit([encoder.finish()]);
             return;
         }
-        for (k, &i) in order.iter().enumerate() {
-            let s = &mut self.slots[i];
-            let model = slot_matrix(&s.pose);
-            let c = s.card.as_mut().unwrap();
-            c.renderer.lighting = lighting;
-            c.renderer.world_lights = Some(lights.clone());
-            c.renderer.render_layer(device, queue, target, layers, k == 0, model, &cam);
-        }
+        let mut cards: Vec<(usize, &mut Slot)> = self.slots.iter_mut().enumerate().filter(|(_, s)| s.visible).collect();
+        cards.sort_by_key(|(i, _)| order.iter().position(|o| o == i));
+        let mut cards: Vec<(&mut crate::renderer::Renderer, Mat4)> = cards
+            .into_iter()
+            .map(|(_, s)| {
+                let model = slot_matrix(&s.pose);
+                let r = &mut s.card.as_mut().unwrap().renderer;
+                r.lighting = lighting;
+                r.world_lights = Some(lights.clone());
+                (r, model)
+            })
+            .collect();
+        crate::renderer::Renderer::render_layers(&mut cards, device, queue, target, layers, &cam);
     }
 
     fn intro_phase(&self) -> IntroPhase {
