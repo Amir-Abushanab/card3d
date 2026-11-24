@@ -437,7 +437,10 @@ async function boot(): Promise<void> {
   let thumbStage: ExportStage | null = null;
   let thumbUse = 0;
   let thumbIdle: ReturnType<typeof setTimeout> | undefined;
-  /** The thumbnail stage (only used under `thumbScheduler.exclusive`): disposed once the queue has drained a while. */
+  /**
+   * The thumbnail stage (only used under `thumbScheduler.exclusive`): disposed once the queue has
+   * drained and the stage wasn't used for a while (a queue waiting for a quiet moment keeps it).
+   */
   const getThumbStage = () => {
     thumbStage ??= new ExportStage(assets, "performance");
     const use = ++thumbUse;
@@ -445,7 +448,7 @@ async function boot(): Promise<void> {
     thumbIdle = setTimeout(
       () =>
         void thumbScheduler.exclusive(async () => {
-          if (use !== thumbUse) return; // used again meanwhile
+          if (use !== thumbUse || thumbScheduler.busy) return; // its next job resets the timer
           thumbStage?.dispose();
           thumbStage = null;
         }),

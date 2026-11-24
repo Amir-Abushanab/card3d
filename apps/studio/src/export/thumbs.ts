@@ -129,6 +129,11 @@ export class ThumbScheduler {
     void this.pump();
   }
 
+  /** Thumbnails are queued or rendering. */
+  get busy(): boolean {
+    return this.running || this.queue.size > 0;
+  }
+
   /** Raise queued items to `visible` (e.g. the category the user switched to). */
   prioritize(ids: readonly string[]): void {
     const want = new Set(ids);
