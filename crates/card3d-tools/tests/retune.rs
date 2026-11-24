@@ -141,3 +141,12 @@ fn a_retuned_card_draws_as_a_built_one() {
     stage.install(card);
     assert!(!retune(&mut stage, &a));
 }
+
+#[test]
+fn a_card_that_animates_by_itself_is_built_again() {
+    let Some(gpu) = gpu() else { return };
+    // The shine add-on without a frozen time animates: a build starts its clock at zero, a retune wouldn't.
+    let shine = |d: String| d.replace(r#""decals": []"#, r#""decals": [], "addons": { "shine": {} }"#);
+    let mut stage = gpu.stage(&shine(design(&[])));
+    assert!(!retune(&mut stage, &shine(design(&[("foilIntensity", "95")]))));
+}

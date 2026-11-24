@@ -544,8 +544,13 @@ impl CardRenderer {
 
     /// Takes `design`'s foil values (each side's style, texture, intensity, glare, motion, scale and
     /// coverage) in place: all that tells it from the design this card was built from when their
-    /// `BuildKey`s are equal. False, changing nothing, when a side would gain or lose its foil.
+    /// `BuildKey`s are equal. False, changing nothing, when a side would gain or lose its foil, or when
+    /// the card animates by itself: its animations' clocks have run, and a built card's start at zero
+    /// (the studio sets a design again to export it, and two exports must come out the same).
     pub fn retune(&mut self, design: &CardDesign) -> bool {
+        if self.animated() {
+            return false;
+        }
         let (front, back) = crate::holo::sides(&design.recipe);
         let holo = &mut self.renderer.holo;
         let has = |front: bool| holo.iter().flatten().any(|h| h.front == front);
