@@ -121,6 +121,13 @@ export default defineConfig({
   },
   build: {
     target: "es2022",
-    rollupOptions: { input: pages },
+    rollupOptions: {
+      input: pages,
+      // The chunk the studio and the showcase share is named after its first module, which can be a small
+      // helper: call the one holding the engine "engine", so the network panel says what it is.
+      output: {
+        chunkFileNames: (c) => `assets/${c.moduleIds.some((id) => id.endsWith("/packages/core/src/engine.ts")) ? "engine" : "[name]"}-[hash].js`,
+      },
+    },
   },
 });
