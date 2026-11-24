@@ -15,7 +15,7 @@ metadata:
   type: core
   domain: engine
   library: "@card3d/core"
-  library_version: "0.1.0"
+  library_version: "0.1.1"
 requires:
   - card-design-json
 sources:

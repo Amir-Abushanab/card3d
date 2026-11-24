@@ -1,5 +1,11 @@
 # @card3d/core
 
+## 0.1.1
+
+### Patch Changes
+
+- [`2c7037a`](https://github.com/Amir-Abushanab/card3d/commit/2c7037a31dcbc38455c35082490ed3e661cbe9c2) Thanks [@Amir-Abushanab](https://github.com/Amir-Abushanab)! - Card Studio's links now point to https://card3d-studio.pages.dev (the READMEs and the bundled agent skills).
+
 ## 0.1.0
 
 ### Minor Changes

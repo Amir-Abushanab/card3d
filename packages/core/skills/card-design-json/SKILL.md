@@ -5,10 +5,10 @@ description: "Use when writing, editing, validating or explaining a Card Studio
   <MetalCard> draw): picking a preset or recipe (material, colour, texture,
   grain, polish, relief, spectrum), holo foil, built-in face shader layers,
   add-ons, the card body (shape, edge, finish, contactless, text lines, logo),
-  lighting and scene staging; checking a design
-  with ensureDesign or lintDesign; reading or making Card Studio share links.
-  For writing custom WGSL face shaders use custom-face-shaders-wgsl; for showing
-  a card on a page use embed-metal-card."
+  lighting and scene staging; checking a design with ensureDesign or lintDesign;
+  reading or making Card Studio share links. For writing custom WGSL face
+  shaders use custom-face-shaders-wgsl; for showing a card on a page use
+  embed-metal-card."
 metadata:
   purpose: "The design model every card3d host draws: what a CardDesign holds, how
     to write one that renders as intended, and how to validate untrusted designs
@@ -16,7 +16,7 @@ metadata:
   type: core
   domain: design-model
   library: "@card3d/core"
-  library_version: "0.1.0"
+  library_version: "0.1.1"
 sources:
   - src/types.ts
   - src/design/**
