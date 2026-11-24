@@ -301,6 +301,149 @@
       "evidence": [
         "Checks at 740b9c8: intent validate (5 skills) and skill-references --check pass; pnpm check passes (format, lint, typecheck, knip, depcruise, notices, all unit tests incl. packages/react SSR tests and packages/core/src/webgpu-marks.test.ts); crates/card3d-web/web/fallback.test.mjs passes all 9 checks; studio e2e specs embed, stickers, showcase, studio, fonts, clip, print pass. Not run: fresh-consumer task checks (skill_spec.md, Remaining work)."
       ]
+    },
+    "source:crates/card3d-engine/shaders/card.wgsl": {
+      "fingerprint": "a80fa26a8933dfc15d8c7d6378d4885b53502c332f774977008e072f79ed8b6b",
+      "snapshot": {
+        "crates/card3d-engine/shaders/card.wgsl": "1bc70bdae33dcefe715d16470549d8e994e8492a410ef50363a41d83a79918da"
+      },
+      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "outcome": "no-change",
+      "reason": "Internal shader cost only: unlit items return from shade() after their colour (uniform condition, samples still up front) and the clearcoat terms run only with a clearcoat. Native renders of all 159 harness designs byte-identical but for up to 4 channels off by 1 in 9 designs (Metal codegen); web WebGPU/WebGL builds within parity on the harness designs. No design field, default or stage behaviour the skills describe changed.",
+      "evidence": [
+        "Changed: crates/card3d-engine/shaders/card.wgsl at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+      ]
+    },
+    "source:crates/card3d-engine/src/card.rs": {
+      "fingerprint": "d90a68237a6d55e956aa9a34a995b89f08f7361ab616949708c291ac738f78f5",
+      "snapshot": {
+        "crates/card3d-engine/src/card.rs": "435b637c9de8151b7ce62f18f4d16eaa7893741dc60003f2ad22342fa2bc0cca"
+      },
+      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "outcome": "no-change",
+      "reason": "Internal: the marquee's map cache now also serves stage cards (by device), and BuildKey/CardRenderer::retune let a stage take foil-value-only design changes in place. Stage.setDesign keeps its contract (resolves true when shown, false when replaced); retuned cards draw identically to built ones (crates/card3d-tools/tests/retune.rs). No skill-described field or behaviour changed.",
+      "evidence": [
+        "Changed: crates/card3d-engine/src/card.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+      ]
+    },
+    "source:crates/card3d-engine/src/design.rs": {
+      "fingerprint": "48824054b4266aac6af9331970aa0695868136910079a5e82f5bd180f4d33c01",
+      "snapshot": {
+        "crates/card3d-engine/src/design.rs": "bbe1f4446202df5ba5fab60ed743325fc4792d370e1a21966d6385318c77d8e4"
+      },
+      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "outcome": "no-change",
+      "reason": "Internal: CardDesign::from_value (from_json for parsed JSON); design reading unchanged.",
+      "evidence": [
+        "Changed: crates/card3d-engine/src/design.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+      ]
+    },
+    "source:crates/card3d-engine/src/env.rs": {
+      "fingerprint": "785c6faafa7330d3f24af4084a12428136c1eb60e8ec3dae6c8d22cd7c3c26c5",
+      "snapshot": {
+        "crates/card3d-engine/src/env.rs": "356419b0b572a0e18afd47bf210c965005b1ba4666788542d87da1f8245ecea1"
+      },
+      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "outcome": "no-change",
+      "reason": "Internal: Look derives PartialEq (the studio environment cache's key); environments unchanged.",
+      "evidence": [
+        "Changed: crates/card3d-engine/src/env.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+      ]
+    },
+    "source:crates/card3d-engine/src/holo.rs": {
+      "fingerprint": "1191e6cb95419d2755b4d6c81b695da9dc7ed1bd4c130053a5fcf1ce150047a8",
+      "snapshot": {
+        "crates/card3d-engine/src/holo.rs": "21820d452a14d960350c1ead1bf71fc2cd5242f42cd50146a97a6f9456715153"
+      },
+      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "outcome": "no-change",
+      "reason": "Internal: holo draws record their side (front/back) for retune; foil rendering and the recipe's foil fields unchanged.",
+      "evidence": [
+        "Changed: crates/card3d-engine/src/holo.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+      ]
+    },
+    "source:crates/card3d-engine/src/marquee.rs": {
+      "fingerprint": "0454a3b597652cdab4f98e952d2db52df84f33ceb043fff23fbfa3c8b7ab98e7",
+      "snapshot": {
+        "crates/card3d-engine/src/marquee.rs": "188b0c1f3dfed30563c822cfc92b0ced986f5b038068497eea2266535ee55300"
+      },
+      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "outcome": "no-change",
+      "reason": "Internal: the map cache moved to card.rs (same code, shared with stage cards); marquee renders byte-identical at the harness's 6 strip states × 2 sizes.",
+      "evidence": [
+        "Changed: crates/card3d-engine/src/marquee.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+      ]
+    },
+    "source:crates/card3d-engine/src/material.rs": {
+      "fingerprint": "645a6948c8da9b9646f814448732a537bc5ebbdf5e146f713aa640f333a93012",
+      "snapshot": {
+        "crates/card3d-engine/src/material.rs": "aa959d297e3d0fbe1315b7f5022604ab32f2fb036c68dde4e1343984359ad674"
+      },
+      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "outcome": "no-change",
+      "reason": "Internal: mip chains convert sRGB bytes by table and back by an exact lookup (unit test checks every step and a stride of 0..1.01 against the formula). Renders byte-identical; nothing in the skills covers it.",
+      "evidence": [
+        "Changed: crates/card3d-engine/src/material.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+      ]
+    },
+    "source:crates/card3d-engine/src/renderer.rs": {
+      "fingerprint": "78ce1ec18861795657aa4b6fc7b73a2cf0c9f875b9c142106127086fecdab476",
+      "snapshot": {
+        "crates/card3d-engine/src/renderer.rs": "bc88403a12b337ed59ee205ce107ef87c8a4eb6a8eab7a81f68c7dbc70a6d6c4"
+      },
+      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "outcome": "no-change",
+      "reason": "Internal: black point lights are left out of the frame uniform, a device cache (surface/chip maps, studio environments) is kept while a card on the device lives, the marquee's core joins the pipeline cache, and holo draws know their side. Renders byte-identical (cache hits and misses); no API or behaviour the skills describe changed.",
+      "evidence": [
+        "Changed: crates/card3d-engine/src/renderer.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+      ]
+    },
+    "source:crates/card3d-engine/src/stage.rs": {
+      "fingerprint": "5c4613ba52c98929027af41d054cd7f9787120ef9590bbbd19302dc81c1aa156",
+      "snapshot": {
+        "crates/card3d-engine/src/stage.rs": "5c10b0aa773feab7f7f9f83aff8ad0d5b804c0d289f9c51f82daabb9485d79c3"
+      },
+      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "outcome": "no-change",
+      "reason": "Internal: Stage::install_keyed / Stage::retune for the web host's fast path; setDesign's documented behaviour (engine-stage stage-api) is unchanged.",
+      "evidence": [
+        "Changed: crates/card3d-engine/src/stage.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+      ]
+    },
+    "source:crates/card3d-engine/tests/retune.rs": {
+      "fingerprint": "17f1a92022c94addf231d779c80415eb5878e3824ec2701764f7559ef79e4e7f",
+      "snapshot": {
+        "crates/card3d-engine/tests/retune.rs": "7ec0620a3684e5fb348932c673563920b7bff7166fc99678d8241846f23da9ab"
+      },
+      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "outcome": "no-change",
+      "reason": "Test only: which design changes keep a BuildKey (foil values) and which don't.",
+      "evidence": [
+        "Changed: crates/card3d-engine/tests/retune.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+      ]
+    },
+    "source:crates/card3d-web/src/lib.rs": {
+      "fingerprint": "abb4c831f8e503254a0befec9a9d6be89e59829bc2be0dbf68b10acb44d51d18",
+      "snapshot": {
+        "crates/card3d-web/src/lib.rs": "37e971585fa388a20d72b27615047f5a7120a697a4aef7a3632abd6808bf56f1"
+      },
+      "head": "33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+      "outcome": "no-change",
+      "reason": "Internal: build() parses the design once, retunes the stage's card in place when only foil values changed, and installs cards with their BuildKey. The JS-facing build/setDesign contract (resolves true when shown, false when replaced) is unchanged.",
+      "evidence": [
+        "Changed: crates/card3d-web/src/lib.rs at 33bed806343589f1f6b8cf3ec74b36fd2eb1f9bf",
+        "cargo test --workspace: pass; pnpm check:rust: pass; native harness renders vs 2c7037a: byte-identical except 1-LSB codegen noise noted; compare.mjs --web --webgl on 4 designs: 0 above target"
+      ]
     }
   }
 }
