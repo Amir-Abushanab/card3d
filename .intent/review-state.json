@@ -333,18 +333,15 @@
       ]
     },
     "source:crates/card3d-engine/src/card.rs": {
-      "fingerprint": "833ba399d656017939259ec245d9829d80b88ce65e137d02c05a959425f21878",
+      "fingerprint": "282d177e5ce9a9567c7930a767f6f756e55dd2a910b0ff430b3e8ac078131e8a",
       "snapshot": {
-        "crates/card3d-engine/src/card.rs": "71d7c035a53d7152fcb50c9d96526a30422b9e997965206282868381a66476d9"
+        "crates/card3d-engine/src/card.rs": "dc71b33220ba4dcc93c75abf57dc533178a9757fa56d2e28c6095ed998301be0"
       },
-      "head": "003a98524dd7dfbadabf53ac641d6ac24ac0ce52",
+      "head": "cefd4107ef61ad4ebdf2ce7f9212d88c882224cf",
       "outcome": "no-change",
-      "reason": "Internal: a card's bind groups and card-shader pipelines are made at the end of its build (Renderer::warm), face layers' prepare no longer takes the pose.",
+      "reason": "Internal: Stage::retune (the in-place foil update added earlier on this branch, never released) now declines cards that animate by themselves, so they are built again as before. No API, option or behaviour the skills describe changes.",
       "evidence": [
-        "Native renders of all 159 harness designs x 4 poses and the marquee strip (6 states x 2 sizes) byte-identical before/after, but for addon-vines-glass, which differs run to run before the change too (2 channels off by 1)",
-        "pnpm check:rust, cargo test --workspace (incl. new crates/card3d-tools/tests/swaps.rs: 14 swaps each draw as a fresh build)",
-        "compare.mjs --web --webgl --only 8 designs: all within target (holo-styles' WebGPU rows are known differences); --marquee --web --webgl (CARD3D_NO_ARCHIVE): worst 0.07",
-        "pnpm e2e: 49 passed, 1 failed (scene.e2e.ts:216, a camera-path GIF exported twice differs); it fails the same with the engine, web bindings and loader at this batch's base 2978b60 (2/2 runs), so it predates the batch"
+        "Changed: crates/card3d-engine/src/card.rs at cefd4107ef61ad4ebdf2ce7f9212d88c882224cf"
       ]
     },
     "source:crates/card3d-engine/src/design.rs": {
