@@ -59,7 +59,6 @@ test("showcase: cardholder names, open fonts and the lighting switcher", async (
   await expect
     .poll(async () => Math.abs((await imageStats(page, await canvas.screenshot())).mean - before.mean), {
       message: "the cards are lit differently",
-      timeout: 10_000,
     })
     .toBeGreaterThan(1);
 
