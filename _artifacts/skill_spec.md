@@ -141,6 +141,21 @@ agents in projects that consume these packages; the repository's own contributor
   verified accurate (descriptions unchanged). Checks: `intent validate`, unit tests (react SSR, the
   loader's start marks), the studio e2e specs for embed, stickers, showcase, studio, fonts, clip and print.
 
+- Engine performance, second batch (2026-11-24, packages at 0.1.0 unreleased, @tanstack/intent 0.5.6).
+  Source change: on the WebGPU build every stage on a page shares one device (each canvas its own
+  surface), so a lost device moves every stage to the WebGL build at once (before, only the stage whose
+  device it was); the loader downloads the engine parts a design needs together with the main module
+  (`engineParts` / `preloadParts` in wasm/loader.js, `preload` in each package's split loader); the
+  engine keeps a device's shader modules, pipelines and CPU-drawn textures for its next card, writes a
+  card's item uniforms in one call and draws the marquee in one pass (renders byte-identical).
+  Guidance: engine-stage's overview says the parts download together, its many-cards entry that WebGPU
+  stages share a device and fall over together; core's README the same. Decision: `<metal-card>`'s pool
+  stays at 12 live cards on WebGPU too (pool.ts): a lost shared device moves every live card to WebGL at
+  once, and those contexts must fit under the browsers' 16; embed-metal-card's statement of the limit
+  stays accurate. Records: domain_map and skill_tree verified accurate (no task, failure mode or
+  description changes). Checks: `intent validate`, unit tests (engineParts), fallback.test.mjs (two cards
+  on one device fall over together), the studio e2e suite.
+
 ## Remaining work
 
 - Record the first source review right after the repository's first commit and before the first push (a
