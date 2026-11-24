@@ -1215,10 +1215,14 @@ impl Renderer {
             Some(w) => (w, view),
             None => (&self.point_lights, view * model),
         };
-        for (k, p) in lights.iter().take(4).enumerate() {
+        // A black light adds nothing (a shine add-on turned away still has its two): left out, it
+        // costs the shader no loop and leaves its slot to a light that shows.
+        let mut count = 0;
+        for (k, p) in lights.iter().filter(|p| p.color != [0.0; 3]).take(4).enumerate() {
             let v = to_view.transform_point3(Vec3::from(p.position));
             points[2 * k] = [v.x, v.y, v.z, p.distance];
             points[2 * k + 1] = [p.color[0], p.color[1], p.color[2], p.decay];
+            count = k + 1;
         }
         let fill = (Mat3::from_mat4(view) * Vec3::from(lt.fill_position)).normalize();
         let fill_on = if lt.fill == [0.0; 3] { 0.0 } else { 1.0 };
@@ -1228,7 +1232,7 @@ impl Renderer {
             light_dir: [light.x, light.y, light.z, 0.0],
             light_color: [lt.key[0], lt.key[1], lt.key[2], 0.0],
             ambient: [lt.ambient[0], lt.ambient[1], lt.ambient[2], 0.0],
-            misc: [lt.exposure, if linear { 1.0 } else { 0.0 }, lights.len().min(4) as f32, 0.0],
+            misc: [lt.exposure, if linear { 1.0 } else { 0.0 }, count as f32, 0.0],
             env: [lt.env_intensity, lt.env_rotation_y, 0.0, 0.0],
             points,
             fill_dir: [fill.x, fill.y, fill.z, 0.0],

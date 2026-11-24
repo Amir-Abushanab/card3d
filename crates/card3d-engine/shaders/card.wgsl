@@ -375,6 +375,9 @@ fn shade(in: VOut, front_facing: bool) -> Lit {
     lit.color = diffuse_color;
     lit.emissive = draw.emissive.rgb;
     lit.unlit = draw.flags2.w > 0.5;
+    // An unlit item (printed artwork, three's MeshBasicMaterial) needs only its colour. The condition
+    // is uniform, so the derivatives below stay in uniform control flow.
+    if (draw.flags2.w > 0.5) { return lit; }
     if (draw.flags2.y > 0.5) {
         // The chip's contacts: neutral grey (Rec. 709 luminance) after the map.
         diffuse_color = vec4f(vec3f(dot(diffuse_color.rgb, vec3f(0.2126, 0.7152, 0.0722))), diffuse_color.a);
@@ -445,6 +448,9 @@ fn shade(in: VOut, front_facing: bool) -> Lit {
         m.iridescenceFresnel = evalIridescence(1.0, draw.irid.y, dotNVi, draw.irid.z, m.specular);
     }
 
+    // The clearcoat layer's terms only matter with a clearcoat (`combine` weighs them by it).
+    let cc_on = m.clearcoat > 0.0;
+
     // Direct light: the point lights (getPointLightInfo, getDistanceAttenuation), then the directional.
     var direct_specular = vec3f(0.0);
     var direct_diffuse = vec3f(0.0);
@@ -460,19 +466,19 @@ fn shade(in: VOut, front_facing: bool) -> Lit {
         let ip = saturate(dot(N, Lp)) * c;
         direct_specular += ip * BRDF_GGX(Lp, V, N, m);
         direct_diffuse += ip * RECIPROCAL_PI * m.diffuse;
-        cc_specular += saturate(dot(Ncc, Lp)) * c * BRDF_GGX_Clearcoat(Lp, V, Ncc, m);
+        if (cc_on) { cc_specular += saturate(dot(Ncc, Lp)) * c * BRDF_GGX_Clearcoat(Lp, V, Ncc, m); }
     }
     let L = frame.light_dir.xyz;
     let irr = saturate(dot(N, L)) * frame.light_color.rgb;
     direct_specular += irr * BRDF_GGX(L, V, N, m);
     direct_diffuse += irr * RECIPROCAL_PI * m.diffuse;
-    cc_specular += saturate(dot(Ncc, L)) * frame.light_color.rgb * BRDF_GGX_Clearcoat(L, V, Ncc, m);
+    if (cc_on) { cc_specular += saturate(dot(Ncc, L)) * frame.light_color.rgb * BRDF_GGX_Clearcoat(L, V, Ncc, m); }
     if (frame.fill_color.w > 0.0) {
         let Lf = frame.fill_dir.xyz;
         let irf = saturate(dot(N, Lf)) * frame.fill_color.rgb;
         direct_specular += irf * BRDF_GGX(Lf, V, N, m);
         direct_diffuse += irf * RECIPROCAL_PI * m.diffuse;
-        cc_specular += saturate(dot(Ncc, Lf)) * frame.fill_color.rgb * BRDF_GGX_Clearcoat(Lf, V, Ncc, m);
+        if (cc_on) { cc_specular += saturate(dot(Ncc, Lf)) * frame.fill_color.rgb * BRDF_GGX_Clearcoat(Lf, V, Ncc, m); }
     }
 
     // Indirect: ambient + IBL.
@@ -486,11 +492,13 @@ fn shade(in: VOut, front_facing: bool) -> Lit {
     } else {
         radiance = ibl_radiance(V, N, m.roughness);
     }
-    let cc_radiance = ibl_radiance(V, Ncc, m.clearcoat_roughness);
     var indirect_diffuse = frame.ambient.rgb * RECIPROCAL_PI * m.diffuse;
 
-    let cc_fab = DFGApprox(Ncc, V, m.clearcoat_roughness);
-    cc_specular += cc_radiance * (vec3f(0.04) * cc_fab.x + cc_fab.y);
+    if (cc_on) {
+        let cc_radiance = ibl_radiance(V, Ncc, m.clearcoat_roughness);
+        let cc_fab = DFGApprox(Ncc, V, m.clearcoat_roughness);
+        cc_specular += cc_radiance * (vec3f(0.04) * cc_fab.x + cc_fab.y);
+    }
 
     let fab = DFGApprox(N, V, m.roughness);
     // computeMultiscatteringIridescence passes the iridescence Fresnel as its "F0" (three r180).
