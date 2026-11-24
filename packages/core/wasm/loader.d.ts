@@ -193,6 +193,10 @@ export function loadEngine(backend: "webgpu" | "webgl"): Promise<unknown>;
  * it doesn't wait for a design's fonts and images; returns that build. `createCard` calls it too.
  */
 export function preloadEngine(force?: "webgpu" | "webgl"): "webgpu" | "webgl";
+/** The lazily loaded parts of the engine a design will need (a guess; `preloadParts` takes them). */
+export function engineParts(design: unknown): string[];
+/** Starts downloading those parts on a build, with its main module (`createCard` and `setDesign` do). */
+export function preloadParts(backend: "webgpu" | "webgl", names: string[]): void;
 /** Whether an earlier load showed WebGPU to be unsafe here (a failure this week, or a start that crashed the tab). */
 export function webgpuDistrusted(): boolean;
 /**

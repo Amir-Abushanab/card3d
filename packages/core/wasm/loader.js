@@ -158,15 +158,25 @@ export function preloadEngine(force) {
   return likely;
 }
 
+const imported = {};
+/** One build's JavaScript (its main module not yet downloaded), imported once. */
+function importEngine(backend) {
+  // Literal paths, so bundlers emit each build (and its wasm) as chunks and assets; one import() each,
+  // so a bundler preloads only the build that is asked for.
+  imported[backend] ??= (backend === "webgpu" ? import("./pkg/card3d_web.js") : import("./pkg-webgl/card3d_web.js")).catch((e) => {
+    delete imported[backend]; // let a later call try again
+    throw e;
+  });
+  return imported[backend];
+}
+
 const modules = {};
 /** One build's module, initialised once. */
 export async function loadEngine(backend) {
   if (!modules[backend]) {
     modules[backend] = (async () => {
       try {
-        // Literal paths, so bundlers emit each build (and its wasm) as chunks and assets; one import()
-        // each, so a bundler preloads only the build that is asked for.
-        const mod = backend === "webgpu" ? await import("./pkg/card3d_web.js") : await import("./pkg-webgl/card3d_web.js");
+        const mod = await importEngine(backend);
         await mod.default();
         return mod;
       } catch (e) {
@@ -176,6 +186,50 @@ export async function loadEngine(backend) {
     })();
   }
   return modules[backend];
+}
+
+const FINISHES = new Set(["embossed", "engraved", "etched"]);
+const isObject = (v) => !!v && typeof v === "object";
+
+/**
+ * The lazily loaded parts of the engine a design (as `ensureDesign` returns it) will need: what
+ * crates/card3d-engine/src/card.rs builds with each (`#[wasm_split]` names). A guess on the safe side
+ * of cheap: a part too many costs its download, one too few its wait when the build reaches it.
+ */
+export function engineParts(design) {
+  const d = isObject(design) ? design : {};
+  const r = d.recipe ?? {};
+  const o = d.materialOverride ?? {};
+  const glass = (o.transmission ?? (r.material === "glass" ? 1 : 0)) > 0.5;
+  const shaders = Array.isArray(d.shaders) ? d.shaders.filter((l) => isObject(l) && l.enabled !== false) : [];
+  const on = (v) => v !== undefined && v !== null && v !== false;
+  const parts = [];
+  if (isObject(d.scene)) parts.push("scene");
+  if (glass) parts.push("glass");
+  const shape = d.shape;
+  if (!glass && isObject(shape) && (shape.orientation === "portrait" || shape.cutouts?.length || typeof shape.cornerRadius === "number")) parts.push("shape");
+  if (shaders.length) parts.push("faces");
+  if (shaders.some((l) => l.id === "liquid-metal")) parts.push("liquid_metal");
+  if (!glass && isObject(d.edge) && (["metal", "anodized", "match"].includes(d.edge.finish) || d.edge.chamfer === true)) parts.push("edge");
+  const holo = (r.frontHolo && r.foilIntensity > 0) || (!r.matchHoloSides && r.backHolo && r.backFoilIntensity > 0);
+  if (!glass && holo) parts.push("holo");
+  if (isObject(d.contactless) || Object.values(d.finish ?? {}).some((f) => FINISHES.has(f))) parts.push("finish");
+  if (Array.isArray(d.decals) && d.decals.some((x) => x?.src)) parts.push("stickers");
+  if (on(d.addons?.shine)) parts.push("shine");
+  if (on(d.addons?.vines)) parts.push("vines");
+  return parts;
+}
+
+/**
+ * Starts downloading the parts of the engine `names` (`engineParts`) on `backend`'s build, with its
+ * main module rather than one after another as a build reaches each (the package's `preload`).
+ */
+export function preloadParts(backend, names) {
+  if (!names.length) return;
+  importEngine(backend).then(
+    (mod) => mod.preload?.(names),
+    () => {}, // a card that needs the engine retries and reports the failure
+  );
 }
 
 /**
@@ -592,10 +646,13 @@ export async function createCard(
     stage: options = {},
   } = {},
 ) {
-  // The engine downloads (and the adapter is found) while the design's images load.
+  // The engine downloads (and the adapter is found) while the design's images load, and the parts
+  // of it the design needs with it.
   const likely = preloadEngine(force);
+  const parsed = JSON.parse(design);
+  preloadParts(likely, engineParts(parsed));
   const [images, available] = await Promise.all([
-    loadDesignImages(JSON.parse(design), resolveUrl, environmentUrl, assets),
+    loadDesignImages(parsed, resolveUrl, environmentUrl, assets),
     force || likely === "webgl" ? null : webgpuAvailable(),
   ]);
   /** The design on screen, replayed on a fall-over. */
@@ -647,6 +704,7 @@ export async function createCard(
   let watch = 0;
   const startWebgl = async (why) => {
     clearInterval(watch);
+    preloadParts("webgl", engineParts(JSON.parse(current.design)));
     if (backend === "webgpu") {
       canvas = freshCanvas(canvas);
       onCanvas?.(canvas);
@@ -779,7 +837,9 @@ export async function createCard(
     },
     /** Shows another design (resolves false when a newer one replaced it first). */
     async setDesign(json, { fontFamily: family } = {}) {
-      const next = { design: json, images: await loadDesignImages(JSON.parse(json), resolveUrl, environmentUrl, assets), fontFamily: family };
+      const parsed = JSON.parse(json);
+      preloadParts(backend, engineParts(parsed));
+      const next = { design: json, images: await loadDesignImages(parsed, resolveUrl, environmentUrl, assets), fontFamily: family };
       current = next;
       const s = stage;
       if (!s || switching || lost) return false;

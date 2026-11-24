@@ -3,7 +3,20 @@
 // way). A module of its own so pages without a marquee don't carry it: packages/core/src/marquee/mount.ts
 // imports it.
 
-import { BUILD, GOOD_MS, OP, freshCanvas, holdWebgpuStart, isLoadError, loadDesignImages, loadEngine, preloadEngine, webgpuAvailable } from "./loader.js";
+import {
+  BUILD,
+  GOOD_MS,
+  OP,
+  engineParts,
+  freshCanvas,
+  holdWebgpuStart,
+  isLoadError,
+  loadDesignImages,
+  loadEngine,
+  preloadEngine,
+  preloadParts,
+  webgpuAvailable,
+} from "./loader.js";
 
 /** The page's view of a wasm `CardStage` made for the marquee (`WasmMarqueeStage`). */
 function marqueeStage(raw) {
@@ -37,6 +50,7 @@ export async function createMarquee(
   { force, stage: options = {}, onCanvas, onRestart, onFallback, onContextLost, resolveUrl = (s) => s, assets = null } = {},
 ) {
   const likely = preloadEngine(force);
+  preloadParts(likely, ["marquee"]);
   let backend = force ?? (likely === "webgpu" && (await webgpuAvailable()) ? "webgpu" : "webgl");
   let stage = null;
   let switching = null;
@@ -156,7 +170,13 @@ export async function createMarquee(
     },
     /** Builds a slot's card on the current stage (false: replaced, or the stage changed meanwhile). */
     async buildSlot(slot, token, json, { fontFamily } = {}) {
-      const images = await loadDesignImages(JSON.parse(json), resolveUrl, null, assets);
+      const design = JSON.parse(json);
+      // The marquee's cards have no scenes.
+      preloadParts(
+        backend,
+        engineParts(design).filter((p) => p !== "scene"),
+      );
+      const images = await loadDesignImages(design, resolveUrl, null, assets);
       const s = stage;
       if (!s || switching || lost || disposed) return false;
       try {
