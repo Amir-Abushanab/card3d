@@ -1,6 +1,6 @@
 {
   "name": "@card3d/react",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Drop-in 3D metal cards for React: the <MetalCard> component",
   "keywords": [
     "3d",
