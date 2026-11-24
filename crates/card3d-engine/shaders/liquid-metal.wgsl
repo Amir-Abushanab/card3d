@@ -184,13 +184,10 @@ fn getColorChanges(c1: f32, c2: f32, stripe_p: f32, w: vec3f, blur: f32, bump_in
     return ch;
 }
 
-fn getImgFrame(uv: vec2f, th: f32) -> f32 {
-    var frame = 1.0;
-    frame *= smoothstep(0.0, th, uv.y);
-    frame *= 1.0 - smoothstep(1.0 - th, 1.0, uv.y);
-    frame *= smoothstep(0.0, th, uv.x);
-    frame *= 1.0 - smoothstep(1.0 - th, 1.0, uv.x);
-    return frame;
+// The image's frame: 1 inside the unit square, 0 outside. (The original faded it over a width that is
+// always 0 here, a smoothstep with low == high: lavapipe returns 0 for it, which hid the whole mark.)
+fn getImgFrame(uv: vec2f) -> f32 {
+    return select(0.0, 1.0, all(uv > vec2f(0.0)) && all(uv < vec2f(1.0)));
 }
 
 // The procedural shapes' anti-aliased cut at 0.9, two pixels of `edge` wide. Where `edge` is flat (inside
@@ -354,7 +351,7 @@ fn fs(in: VOut) -> @location(0) vec4f {
     var opacity = 0.0;
     if (isImage) {
         opacity = img.g;
-        let frame = getImgFrame(in.imageUV, 0.0);
+        let frame = getImgFrame(in.imageUV);
         opacity *= frame;
     } else {
         opacity = 1.0 - edgeCut(edge);

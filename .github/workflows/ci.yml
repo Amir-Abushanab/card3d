@@ -216,6 +216,8 @@ jobs:
         with:
           name: e2e-results
           path: apps/studio/e2e/.results
+          # a dot-folder, which upload-artifact leaves out by default
+          include-hidden-files: true
           retention-days: 7
           if-no-files-found: ignore
 
