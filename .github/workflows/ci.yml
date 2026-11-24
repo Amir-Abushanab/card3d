@@ -375,8 +375,9 @@ jobs:
       # it from a temp store without touching the workspace, and wrangler reads the CLOUDFLARE_* env.
       - name: Deploy to Cloudflare Pages
         run: |
-          # wrangler doesn't auto-create the Pages project — create it once (no-op once it exists).
-          pnpm dlx wrangler pages project create card3d-studio --production-branch=main || true
+          # wrangler doesn't auto-create the Pages project — create it once (no-op once it exists). --force
+          # keeps it on classic Pages: recent wranglers hand a new project to Workers, which refuses a workspace root.
+          pnpm dlx wrangler pages project create card3d-studio --production-branch=main --force || true
           pnpm dlx wrangler pages deploy apps/studio/dist --project-name=card3d-studio --branch=main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

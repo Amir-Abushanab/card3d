@@ -70,7 +70,7 @@ One-time:
 4. _(Not needed — the workflow creates the project on its first deploy. Do it by hand only if you prefer.)_ Create it explicitly:
    ```sh
    pnpm dlx wrangler login
-   pnpm dlx wrangler pages project create card3d-studio --production-branch=main
+   pnpm dlx wrangler pages project create card3d-studio --production-branch=main --force
    ```
 
 Then **push to `main`** → CI checks, builds, runs the e2e tests and deploys. The live URLs are
