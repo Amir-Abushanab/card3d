@@ -9,9 +9,7 @@ import type { Side } from "@card3d/core/model";
 import { ISO_7811_AREAS, ISO_CHIP_PLATE, ISO_CHIP_PLATE_MM } from "@card3d/core/editor";
 import { button, createDialog } from "../ui/dialog.ts";
 import { canEncodeWebp, h, loadImage } from "../ui/dom.ts";
-
-export const FACE_W = 1280;
-export const FACE_H = 804; // 1280 × 540/860
+import { FACE_H, FACE_W } from "./face.ts";
 
 const PEN_COLORS: { name: string; value: string }[] = [
   { name: "Ink", value: "#141414" },
