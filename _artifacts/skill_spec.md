@@ -140,6 +140,9 @@ agents in projects that consume these packages; the repository's own contributor
   API was added or removed. Records: domain_map gains the in-place edit failure mode; skill_tree
   verified accurate (descriptions unchanged). Checks: `intent validate`, unit tests (react SSR, the
   loader's start marks), the studio e2e specs for embed, stickers, showcase, studio, fonts, clip and print.
+  Reverted before release: the `<MetalCard>` change (in-place edits stopped reaching the card, a breaking
+  change for a patch), with its metal-card-react entry and the domain_map failure mode; the wrapper
+  serialises an object design on every render again.
 
 - Engine performance, second batch (2026-11-24, packages at 0.1.0 unreleased, @tanstack/intent 0.5.6).
   Source change: on the WebGPU build every stage on a page shares one device (each canvas its own

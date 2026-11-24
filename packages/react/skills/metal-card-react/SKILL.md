@@ -117,10 +117,9 @@ the server / client boundary.
 
 ## Common mistakes
 
-- Building a new design object every render works (a new object is compared by its JSON, so equal
-  content doesn't rebuild the card), but each new object is serialised again, which costs with multi-MB
-  data-URL images: memoise it (`useMemo`) or host the images. The same object isn't serialised again,
-  so editing it in place doesn't update the card: pass a new object.
+- Building a new design object from scratch every render is fine (compared by JSON), but a design
+  holding multi-MB data-URL images is re-serialised each render: memoise it (`useMemo`) or host the
+  images.
 - Passing `onReady` / `onError` from a server component: functions can't be serialised; wrap the
   card in a client component.
 - Expecting `environment` or `floor` props: use `design.scene`.

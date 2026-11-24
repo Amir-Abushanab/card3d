@@ -168,11 +168,6 @@ skills:
         source: src/index.tsx
         priority: MEDIUM
         status: active
-      - mistake: editing the design object in place
-        mechanism: the wrapper serialises a design object only when it is a new object, so an in-place edit never reaches the card
-        source: src/index.tsx
-        priority: MEDIUM
-        status: active
 
 cross_references:
   - from: custom-face-shaders-wgsl
